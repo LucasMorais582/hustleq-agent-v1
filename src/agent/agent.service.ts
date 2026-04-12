@@ -1,29 +1,81 @@
 import OpenAI from "openai";
 import type { AgentInput } from "../types/agent.types.js";
+
+import { BASE_PROMPT } from "./prompts/base.prompt.js";
+import { STYLE_PROMPT } from "./prompts/style.prompt.js";
+
+import { IDEAS_PROMPT } from "./prompts/modes/ideas.prompt.js";
+import { ANALYSIS_PROMPT } from "./prompts/modes/analysis.prompt.js";
+import { CAPTION_PROMPT } from "./prompts/modes/caption.prompt.js";
+
 import type { ChatCompletionMessageParam } from "openai/resources";
 
-function getModeInstruction(mode?: string) {
+import { IDEAS_FORMAT } from "./prompts/format/ideas.format.js";
+import { CAPTION_FORMAT } from "./prompts/format/caption.format.js";
+import { ANALYSIS_FORMAT } from "./prompts/format/analysis.format.js";
+import { BEST_TIME_FORMAT } from "./prompts/format/bestTime.format.js";
+
+function getModePrompt(mode?: string) {
   switch (mode) {
     case "IDEAS":
-      return `
-Foque principalmente em ideias de conteúdo.
-Capriche na seção "Ideias de conteúdo".
-`;
-
+      return IDEAS_PROMPT;
     case "ANALYSIS":
-      return `
-Foque principalmente em análise estratégica.
-Aprofunde o diagnóstico.
-`;
-
+      return ANALYSIS_PROMPT;
     case "CAPTION":
+      return CAPTION_PROMPT;
+    default:
+      return "";
+  }
+}
+
+function getFormatPrompt(mode?: string) {
+  switch (mode) {
+    case "IDEAS":
+      return IDEAS_FORMAT;
+    case "CAPTION":
+      return CAPTION_FORMAT;
+    case "ANALYSIS":
+      return ANALYSIS_FORMAT;
+    case "BEST_TIME":
+      return BEST_TIME_FORMAT;
+    default:
+      return ANALYSIS_FORMAT;
+  }
+}
+
+function getGoalInstruction(goal?: string) {
+  switch (goal) {
+    case "ENGAGEMENT":
       return `
-Foque principalmente em escrita persuasiva.
-Capriche na seção de exemplos com legendas completas.
-`;
+        FOCUS: Engagement
+
+        - Prioritize comments, shares and interaction
+        - Use questions when appropriate
+        - Encourage users to respond
+      `;
+
+    case "CONVERSION":
+      return `
+      FOCUS: Conversion
+
+      - Drive action (buy, click, message)
+      - Use strong and clear CTA
+      - Highlight value and urgency when relevant
+    `;
+
+    case "EDUCATIONAL":
+      return `
+      FOCUS: Educational
+
+      - Teach something useful
+      - Be clear and structured
+      - Deliver value before asking for action
+    `;
 
     default:
-      return "Responda normalmente como consultor.";
+      return `
+      FOCUS: General marketing performance
+    `;
   }
 }
 
@@ -33,60 +85,56 @@ export async function runAgent(input: AgentInput) {
   });
 
   const systemPrompt = `
-Você é um consultor especialista em marketing para Instagram.
+    ${BASE_PROMPT}
 
-Seu objetivo é ajudar o cliente a crescer seguidores, aumentar engajamento e gerar vendas.
+    ${STYLE_PROMPT}
 
-REGRAS:
-- Seja direto, estratégico e prático
-- Evite respostas genéricas
-- Sempre personalize com base no contexto
-- Sempre traga exemplos concretos
+    ${getModePrompt(input.mode)}
 
-FORMATO OBRIGATÓRIO DE RESPOSTA:
+    ${getGoalInstruction(input.contentGoal)}
 
-Responda SEMPRE em JSON válido.
+    ${getFormatPrompt(input.mode)}
 
-{
-  "diagnostic": "análise do perfil",
-  "strategy": "estratégia geral",
-  "ideas": ["ideia 1", "ideia 2", "ideia 3"],
-  "examples": "exemplo de legenda ou post",
-  "postingFrequency": "frequência recomendada",
-  "bestTime": "melhores horários"
-}
+    IMPORTANT:
 
-REGRAS:
-- NÃO responda em texto
-- NÃO use markdown
-- NÃO explique nada fora do JSON
+    You must strictly follow the response format.
 
-IMPORTANTE:
-- Nunca responda fora desse formato
-- Nunca deixe seções vazias
-`;
+    Do NOT include any fields that are not explicitly requested.
 
-  const modeInstruction = getModeInstruction(input.mode);
+    If the mode is CAPTION, return ONLY caption fields.
+    If the mode is IDEAS, return ONLY ideas.
+    If the mode is ANALYSIS, return ONLY analysis fields.
+  `;
+
+  const safeHistory = (input.history || []).map((msg) => ({
+    role: msg.role,
+    content:
+      typeof msg.content === "string"
+        ? msg.content
+        : JSON.stringify(msg.content),
+  }));
 
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
 
-    ...(input.history || []),
+    ...safeHistory,
 
     {
       role: "user",
       content: `
-MODO:
-${modeInstruction}
+        MODE: ${input.mode}
+        GOAL: ${input.contentGoal}
 
-DADOS DO PERFIL:
-${JSON.stringify(input.instagramData)}
+        Follow strictly the required JSON format for this mode.
 
-CONTEXTO DO NEGÓCIO:
-${JSON.stringify(input.businessContext)}
+        DADOS:
+        ${JSON.stringify(input.instagramData)}
 
-PERGUNTA:
-${input.userMessage}
+        CONTEXTO:
+        ${JSON.stringify(input.businessContext)}
+
+        PERGUNTA:
+        ${input.userMessage}
       `,
     },
   ];
@@ -97,17 +145,15 @@ ${input.userMessage}
     temperature: 0.7,
   });
 
+  const content = response.choices[0]?.message.content ?? "";
 
-    const content = response.choices[0]?.message.content;
+  let parsed;
 
-    let parsed;
-
-    try {
+  try {
     parsed = JSON.parse(content || "{}");
-    } catch (err) {
-    console.error("Erro ao parsear JSON:", content);
+  } catch {
     parsed = { raw: content };
-    }
+  }
 
-    return parsed;
+  return parsed;
 }

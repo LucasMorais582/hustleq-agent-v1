@@ -13,6 +13,7 @@ export type BusinessContext = {
 export type AgentInput = {
   userMessage: string;
   instagramData: any;
+  contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContext;
   mode?: "IDEAS" | "ANALYSIS" | "CAPTION";
   history?: Message[];
