@@ -3,12 +3,17 @@ export type Message = {
   content: string;
 };
 
+export type BusinessContext = {
+  niche: string;
+  targetAudience?: string;
+  goal?: string;
+  tone?: string;
+};
+
 export type AgentInput = {
   userMessage: string;
   instagramData: any;
-  businessContext?: {
-    niche: string;
-    targetAudience?: string;
-  };
+  businessContext: BusinessContext;
+  mode?: "IDEAS" | "ANALYSIS" | "CAPTION";
   history?: Message[];
 };
