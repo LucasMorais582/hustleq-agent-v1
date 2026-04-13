@@ -2,28 +2,80 @@ import "./config/env.js";
 
 import express from "express";
 import cors from "cors";
+import bcrypt from "bcrypt";
+
 import { runAgent } from "./agent/agent.service.js";
 import { prisma } from "./lib/prisma.js";
+import { generateToken } from "./lib/auth.js";
+import { authMiddleware } from "./middleware/auth.middleware.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const conversations: Record<
-  string,
-  {
-    history: any[];
-    context: any;
-    insights: {
-      mainGoal?: string;
-      tone?: string;
-    };
-  }
-> = {};
-
-app.get("/conversations", async (req, res) => {
+app.post("/auth/register", async (req, res) => {
   try {
-    const userId = "temp-user"; // depois vem do auth
+    const { email, password } = req.body;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        error: "Email já está em uso",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+      },
+    });
+
+    const token = generateToken(user.id);
+
+    res.json({ token, user });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao registrar" });
+  }
+});
+
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Usuário não encontrado" });
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+
+    if (!valid) {
+      return res.status(400).json({ error: "Senha inválida" });
+    }
+
+    const token = generateToken(user.id);
+
+    res.json({ token, user });
+
+  } catch (error) {
+    res.status(500).json({ error: "Erro no login" });
+  }
+});
+
+app.get("/conversations", authMiddleware,  async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
 
     const conversations = await prisma.conversation.findMany({
       where: { userId },
@@ -43,7 +95,7 @@ app.get("/conversations", async (req, res) => {
   }
 });
 
-app.get("/conversations/:id/messages", async (req, res) => {
+app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -87,7 +139,7 @@ app.get("/conversations/:id/messages", async (req, res) => {
   }
 });
 
-app.post("/agent/chat", async (req, res) => {
+app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
     // TEMP: criar usuário fake para testes
     // await prisma.user.upsert({
@@ -109,13 +161,22 @@ app.post("/agent/chat", async (req, res) => {
       conversation = await prisma.conversation.create({
         data: {
           title: message.slice(0, 30),
-          userId: "temp-user", // depois vamos trocar por auth real
+          userId: req.user.userId,
         },
       });
     } else {
-      conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          userId: req.user.userId,
+        },
       });
+
+      if (!conversation) {
+        return res.status(403).json({
+          error: "Acesso negado à conversa",
+        });
+      }
     }
 
     if (!conversation) {
