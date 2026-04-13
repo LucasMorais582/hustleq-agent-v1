@@ -73,6 +73,34 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
+app.post("/business-context", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { niche, tone, goal } = req.body;
+
+    const context = await prisma.businessContext.upsert({
+      where: { userId },
+      update: {
+        niche,
+        tone,
+        goal,
+      },
+      create: {
+        userId,
+        niche,
+        tone,
+        goal,
+      },
+    });
+
+    res.json({ context });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao salvar contexto" });
+  }
+});
+
 app.get("/conversations", authMiddleware,  async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
@@ -156,6 +184,16 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
 
     let conversation;
 
+    const contextFromDB = await prisma.businessContext.findUnique({
+      where: { userId: req.user.userId },
+    });
+
+    const dbContext = contextFromDB ? {
+      niche: contextFromDB.niche,
+      tone: contextFromDB.tone,
+      goal: contextFromDB.goal,
+    } : businessContext ? businessContext : {};
+
     // 🧠 1. Criar ou buscar conversa
     if (!conversationId) {
       conversation = await prisma.conversation.create({
@@ -209,7 +247,7 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       history,
       mode,
       contentGoal,
-      businessContext,
+      businessContext : dbContext,
       instagramData: undefined
     });
 

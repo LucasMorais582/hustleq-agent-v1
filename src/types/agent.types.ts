@@ -20,6 +20,6 @@ export type AgentInput = {
   instagramData: any;
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContext;
-  mode?: "IDEAS" | "ANALYSIS" | "CAPTION";
+  mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME";
   history?: HistoryMessage[];
 };

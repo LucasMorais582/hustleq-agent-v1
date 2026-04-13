@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
 model User {
@@ -41,14 +41,14 @@ model Message {
 
 model BusinessContext {
   id        String   @id @default(uuid())
+  userId    String   @unique
   niche     String?
   tone      String?
-  mainGoal  String?
+  goal      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  userId String  @unique
-  user   User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Integration {
