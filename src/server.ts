@@ -21,6 +21,72 @@ const conversations: Record<
   }
 > = {};
 
+app.get("/conversations", async (req, res) => {
+  try {
+    const userId = "temp-user"; // depois vem do auth
+
+    const conversations = await prisma.conversation.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ conversations });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao listar conversas" });
+  }
+});
+
+app.get("/conversations/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. busca do banco
+    const rawMessages = await prisma.message.findMany({
+      where: { conversationId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    });
+
+    // 2. transformação (AQUI entra o trecho)
+   const messages = rawMessages.map((msg) => {
+      if (msg.role === "assistant") {
+        try {
+          return {
+            ...msg,
+            content: JSON.parse(msg.content),
+          };
+        } catch {
+          return {
+            ...msg,
+            content: msg.content,
+          };
+        }
+      }
+
+      return msg;
+    });
+
+    // 3. retorno
+    res.json({ messages });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar mensagens" });
+  }
+});
+
 app.post("/agent/chat", async (req, res) => {
   try {
     // TEMP: criar usuário fake para testes
