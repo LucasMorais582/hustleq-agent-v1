@@ -3,6 +3,11 @@ export type Message = {
   content: string;
 };
 
+export type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type BusinessContext = {
   niche: string;
   targetAudience?: string;
@@ -16,5 +21,5 @@ export type AgentInput = {
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContext;
   mode?: "IDEAS" | "ANALYSIS" | "CAPTION";
-  history?: Message[];
+  history?: HistoryMessage[];
 };
