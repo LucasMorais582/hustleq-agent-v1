@@ -123,6 +123,43 @@ app.get("/conversations", authMiddleware,  async (req: any, res: any) => {
   }
 });
 
+app.delete("/conversations/:id", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    // 🔒 garante que a conversa pertence ao usuário
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    // 🧹 deleta mensagens primeiro (se não tiver cascade no schema)
+    await prisma.message.deleteMany({
+      where: {
+        conversationId: id,
+      },
+    });
+
+    // 🗑️ deleta a conversa
+    await prisma.conversation.delete({
+      where: { id },
+    });
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao deletar conversa" });
+  }
+});
+
 app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -169,17 +206,6 @@ app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
 
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
-    // TEMP: criar usuário fake para testes
-    // await prisma.user.upsert({
-    //   where: { id: "temp-user" },
-    //   update: {},
-    //   create: {
-    //     id: "temp-user",
-    //     email: "test@test.com",
-    //     password: "123456",
-    //   },
-    // });
-
     const { message, conversationId, mode, contentGoal, businessContext } = req.body;
 
     let conversation;
@@ -256,15 +282,28 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       data: {
         conversationId: conversation.id,
         role: "assistant",
-        content: JSON.stringify(response),
+        content: JSON.stringify({
+          type: mode,
+          data: response,
+        })
       },
     });
 
     // 🧠 6. Retornar resposta + conversationId
+    // res.json({
+    //   response,
+    //   type: mode,
+    //   conversationId: conversation.id,
+    // });
     res.json({
-      response,
-      conversationId: conversation.id,
-    });
+    messages: {
+      content: {
+        type: mode,
+        data: response,
+      }
+    },
+    conversationId: conversation.id,
+  });
 
   } catch (error) {
     console.error(error);
