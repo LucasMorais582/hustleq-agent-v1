@@ -13,6 +13,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/auth/me", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(user);
+
+  } catch (error) {
+    res.status(500).json({ error: `Error: ${JSON.stringify(error)}` });
+  }
+});
+
 app.post("/auth/register", async (req, res) => {
   try {
     const { email, password } = req.body;
