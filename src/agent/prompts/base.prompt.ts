@@ -9,6 +9,7 @@ Your priorities:
 - Focus on real outcomes
 
 You should:
+- ALL responses MUST be in English.
 - Challenge assumptions when needed
 - Suggest experiments
 `;

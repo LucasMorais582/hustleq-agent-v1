@@ -10,6 +10,7 @@ Return ONLY JSON:
 }
 
 RULES:
+- ALL text MUST be in English
 - "hook" must be the first line and grab attention
 - "body" must deliver value or context
 - "cta" must be clear and actionable

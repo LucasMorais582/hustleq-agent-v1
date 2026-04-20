@@ -290,11 +290,6 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
     });
 
     // 🧠 6. Retornar resposta + conversationId
-    // res.json({
-    //   response,
-    //   type: mode,
-    //   conversationId: conversation.id,
-    // });
     res.json({
     messages: {
       content: {
