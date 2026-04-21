@@ -85,6 +85,24 @@ STYLE:
 
 ---
 
+CREATIVE EXPLORATION (IMPORTANT):
+
+Before writing the final caption:
+- Think of at least 3 different hook angles (e.g., curiosity, contrarian, relatable)
+- Think of at least 2 CTA styles (soft vs direct)
+
+Then:
+- Select the strongest combination for the main output
+- Generate 3 additional caption variations using different angles
+
+VARIATION RULES:
+- Variations must NOT be simple rewrites
+- Each variation must feel like a different post idea
+- Each variation should use a different hook approach or emotional angle
+- Avoid repeating the same structure or wording
+
+---
+
 IMPORTANT:
 
 - The caption must feel like it was written specifically for that business

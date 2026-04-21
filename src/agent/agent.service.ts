@@ -104,6 +104,23 @@ export async function runAgent(input: AgentInput) {
     If the mode is CAPTION, return ONLY caption fields.
     If the mode is IDEAS, return ONLY ideas.
     If the mode is ANALYSIS, return ONLY analysis fields.
+
+    BUSINESS CONTEXT RULES (CRITICAL):
+
+    - Treat the business context as the user's current understanding, not absolute truth
+    - Do NOT blindly follow it if better alternatives exist
+    - Suggest improvements when relevant
+    - Challenge weak assumptions respectfully
+    - Ask clarifying questions when information is missing or unclear
+    - Provide best-guess outputs when needed and explain what could improve accuracy
+    - Always prioritize real outcomes (leads, sales, conversions) over vanity metrics
+
+    CRITICAL:
+
+    When a JSON format is required:
+    - Return ONLY JSON
+    - Do NOT use markdown
+    - Do NOT wrap in code blocks
   `;
 
   const safeHistory = (input.history || []).map((msg) => ({
@@ -127,32 +144,52 @@ export async function runAgent(input: AgentInput) {
 
         Follow strictly the required JSON format for this mode.
 
-        DADOS:
+        DATA:
         ${JSON.stringify(input.instagramData)}
 
-        CONTEXTO:
+        CONTEXT:
         ${JSON.stringify(input.businessContext)}
 
-        PERGUNTA:
+        QUESTION:
         ${input.userMessage}
       `,
     },
   ];
 
+  const modelMap: any = {
+    CAPTION: "gpt-4o",
+    IDEAS: "gpt-4o",
+    ANALYSIS: "gpt-4o",
+    BEST_TIME: "gpt-4o",
+    PERSONA: "gpt-4o",
+    MARKET_INSIGHTS: "gpt-4o"
+  };
+
+  const model = modelMap[input.mode as keyof typeof modelMap] ?? "gpt-4o";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model,
     messages,
     temperature: 0.7,
   });
+  
+  console.log({
+    tokens: response.usage,
+  });
 
   const content = response.choices[0]?.message.content ?? "";
+  const cleaned = content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
   let parsed;
 
   try {
-    parsed = JSON.parse(content || "{}");
+    parsed = JSON.parse(cleaned);
   } catch {
-    parsed = { raw: content };
+    console.error("JSON parse failed:", cleaned);
+    parsed = { raw: cleaned };
   }
 
   return parsed;
