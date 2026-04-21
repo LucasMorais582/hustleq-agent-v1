@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
+  name  String
   email     String   @unique
   password  String
   createdAt DateTime @default(now())
@@ -40,15 +41,48 @@ model Message {
 }
 
 model BusinessContext {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  niche     String?
-  tone      String?
-  goal      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
 
-  user User @relation(fields: [userId], references: [id])
+  // 🧠 BUSINESS
+  businessName    String?
+  description     String?
+  niche           String?
+  location        String?
+  experienceLevel String?
+  type            String? // services, products, both
+
+  // 🧠 OFFERINGS
+  offerings       String[] // simples e suficiente
+
+  // 🧠 AUDIENCE
+  idealCustomer   String?
+  mainProblem     String?
+  customerMindset String?
+  acquisitionChannels String[]
+
+  // 🧠 GOALS
+  primaryGoals    String[] // ENGAGEMENT, CONVERSION, etc
+  successDefinition String?
+  shortTermStrategy String?
+
+  // 🧠 BRAND VOICE
+  tone            String[]
+  desiredFeeling  String?
+  avoidTopics     String[]
+
+  // 🧠 CONTENT STRATEGY
+  contentFocus    String[]
+  currentIssues   String[]
+  desiredShift    String?
+
+  // 🧠 REFERENCES
+  inspirations    String[]
+  competitors     String[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Integration {

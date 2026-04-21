@@ -8,6 +8,8 @@ import { runAgent } from "./agent/agent.service.js";
 import { prisma } from "./lib/prisma.js";
 import { generateToken } from "./lib/auth.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
+import { mapContextToAgent, upsertBusinessContext } from "./services/businessContext.service.js";
+import type { BusinessContextInput } from "./types/agent.types.js";
 
 const app = express();
 app.use(cors());
@@ -38,7 +40,7 @@ app.get("/auth/me", authMiddleware, async (req: any, res: any) => {
 
 app.post("/auth/register", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { name, email, password } = req.body;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -54,6 +56,7 @@ app.post("/auth/register", async (req, res) => {
 
     const user = await prisma.user.create({
       data: {
+        name,
         email,
         password: hashedPassword,
       },
@@ -96,25 +99,25 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
-app.post("/business-context", authMiddleware, async (req: any, res: any) => {
+app.get("/business-context", authMiddleware, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
-    const { niche, tone, goal } = req.body;
-
-    const context = await prisma.businessContext.upsert({
+    const context = await prisma.businessContext.findUnique({
       where: { userId },
-      update: {
-        niche,
-        tone,
-        goal,
-      },
-      create: {
-        userId,
-        niche,
-        tone,
-        goal,
-      },
     });
+
+    res.json({ context });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar contexto" });
+  }
+});
+
+app.post("/business-context", authMiddleware, async (req: any, res: any) => {
+  try {
+    const data = req.body;
+    const userId = req.user.userId;
+    const context = await upsertBusinessContext(userId, data);
 
     res.json({ context });
 
@@ -237,11 +240,15 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       where: { userId: req.user.userId },
     });
 
-    const dbContext = contextFromDB ? {
-      niche: contextFromDB.niche,
-      tone: contextFromDB.tone,
-      goal: contextFromDB.goal,
-    } : businessContext ? businessContext : {};
+    const fallbackContext: BusinessContextInput = {
+      niche: "general business",
+      tone: ["professional"],
+      primaryGoals: ["ENGAGEMENT"],
+    };
+
+    const dbContext = contextFromDB ? 
+    mapContextToAgent(contextFromDB) : businessContext ?
+      mapContextToAgent(businessContext) : fallbackContext;
 
     // 🧠 1. Criar ou buscar conversa
     if (!conversationId) {
