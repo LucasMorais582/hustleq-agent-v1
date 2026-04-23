@@ -14,6 +14,9 @@ import { IDEAS_FORMAT } from "./prompts/format/ideas.format.js";
 import { CAPTION_FORMAT } from "./prompts/format/caption.format.js";
 import { ANALYSIS_FORMAT } from "./prompts/format/analysis.format.js";
 import { BEST_TIME_FORMAT } from "./prompts/format/bestTime.format.js";
+import { CONTENT_STRATEGY_PROMPT } from "./prompts/modes/contentStrategy.prompt.js";
+
+import { buildBusinessContextPrompt } from "../services/businessContext.service.js";
 
 function getModePrompt(mode?: string) {
   switch (mode) {
@@ -23,6 +26,8 @@ function getModePrompt(mode?: string) {
       return ANALYSIS_PROMPT;
     case "CAPTION":
       return CAPTION_PROMPT;
+    case "CONTENT_STRATEGY":
+      return CONTENT_STRATEGY_PROMPT;
     default:
       return "";
   }
@@ -84,10 +89,14 @@ export async function runAgent(input: AgentInput) {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
+  const contextPrompt = buildBusinessContextPrompt(input.businessContext);
+
   const systemPrompt = `
     ${BASE_PROMPT}
 
     ${STYLE_PROMPT}
+
+    ${contextPrompt}
 
     ${getModePrompt(input.mode)}
 
@@ -147,9 +156,6 @@ export async function runAgent(input: AgentInput) {
         DATA:
         ${JSON.stringify(input.instagramData)}
 
-        CONTEXT:
-        ${JSON.stringify(input.businessContext)}
-
         QUESTION:
         ${input.userMessage}
       `,
@@ -161,6 +167,7 @@ export async function runAgent(input: AgentInput) {
     IDEAS: "gpt-4o",
     ANALYSIS: "gpt-4o",
     BEST_TIME: "gpt-4o",
+    CONTENT_STRATEGY: "gpt-4o",
     PERSONA: "gpt-4o",
     MARKET_INSIGHTS: "gpt-4o"
   };

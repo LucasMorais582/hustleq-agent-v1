@@ -10,6 +10,12 @@ import { generateToken } from "./lib/auth.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
 import { mapContextToAgent, upsertBusinessContext } from "./services/businessContext.service.js";
 import type { BusinessContextInput } from "./types/agent.types.js";
+import { 
+  createContentStrategy,
+  deleteContentStrategy,
+  getContentStrategyById,
+  listContentStrategies 
+} from "./services/contentStrategy.service.js";
 
 const app = express();
 app.use(cors());
@@ -127,6 +133,73 @@ app.post("/business-context", authMiddleware, async (req: any, res: any) => {
   }
 });
 
+app.get("/content-strategy", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+
+    const strategies = await listContentStrategies(userId);
+
+    res.json({ strategies });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao listar estratégias" });
+  }
+});
+
+app.get("/content-strategy/:id", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const strategy = await getContentStrategyById(userId, id);
+
+    if (!strategy) {
+      return res.status(404).json({ error: "Strategy not found" });
+    }
+
+    res.json({ strategy });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar estratégia" });
+  }
+});
+
+app.post("/content-strategy", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { name, description, pillars } = req.body;
+
+    const strategy = await createContentStrategy(userId, {
+      name,
+      description,
+      pillars,
+    });
+
+    res.json({ strategy });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao criar estratégia" });
+  }
+});
+
+app.delete("/content-strategy/:id", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    await deleteContentStrategy(userId, id);
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao deletar estratégia" });
+  }
+});
+
 app.get("/conversations", authMiddleware,  async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
@@ -232,7 +305,7 @@ app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
 
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
-    const { message, conversationId, mode, contentGoal, businessContext } = req.body;
+    const { message, conversationId, mode, contentGoal } = req.body;
 
     let conversation;
 
@@ -247,8 +320,7 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
     };
 
     const dbContext = contextFromDB ? 
-    mapContextToAgent(contextFromDB) : businessContext ?
-      mapContextToAgent(businessContext) : fallbackContext;
+    mapContextToAgent(contextFromDB) : fallbackContext;
 
     // 🧠 1. Criar ou buscar conversa
     if (!conversationId) {

@@ -51,3 +51,76 @@ export async function upsertBusinessContext(userId: string, data: BusinessContex
     },
   });
 }
+
+export function buildBusinessContextPrompt(context: any): string {
+  if (!context) return "";
+
+  const safeArray = (arr?: string[]) =>
+    Array.isArray(arr) && arr.length > 0 ? arr.join(", ") : null;
+
+  const sections: string[] = [];
+
+    // 🔹 BUSINESS
+    if (context.businessName || context.niche || context.description) {
+          sections.push(`
+      BUSINESS:
+      ${context.businessName ? `- Name: ${context.businessName}` : ""}
+      ${context.niche ? `- Niche: ${context.niche}` : ""}
+      ${context.description ? `- Description: ${context.description}` : ""}
+      `.trim());
+    }
+
+    // 🔹 OFFER
+    if (context.offerings) {
+          sections.push(`
+      OFFER:
+      ${safeArray(context.offerings) ? `- Services/Products: ${safeArray(context.offerings)}` : ""}
+      `.trim());
+    }
+
+    // 🔹 AUDIENCE
+    if (context.idealCustomer || context.mainProblem) {
+      sections.push(`
+      AUDIENCE:
+      ${context.idealCustomer ? `- Ideal Customer: ${context.idealCustomer}` : ""}
+      ${context.mainProblem ? `- Main Problem: ${context.mainProblem}` : ""}
+      `.trim());
+    }
+
+    // 🔹 MARKETING CONTEXT
+    if (context.primaryGoals || context.acquisitionChannels) {
+      sections.push(`
+      MARKETING:
+      ${safeArray(context.primaryGoals) ? `- Goals: ${safeArray(context.primaryGoals)}` : ""}
+      ${safeArray(context.acquisitionChannels) ? `- Acquisition Channels: ${safeArray(context.acquisitionChannels)}` : ""}
+      `.trim());
+    }
+
+    // 🔹 BRAND VOICE
+    if (context.tone || context.avoidTopics) {
+      sections.push(`
+      BRAND VOICE:
+      ${safeArray(context.tone) ? `- Tone: ${safeArray(context.tone)}` : ""}
+      ${safeArray(context.avoidTopics) ? `- Avoid: ${safeArray(context.avoidTopics)}` : ""}
+      `.trim());
+    }
+
+    // 🔹 SUCCESS DEFINITION (forte pra estratégia)
+    if (context.successDefinition) {
+      sections.push(`
+      SUCCESS:
+      - Definition: ${context.successDefinition}
+      `.trim());
+    }
+
+    return `
+      You are assisting a business with the following context:
+
+      ${sections.join("\n\n")}
+
+      IMPORTANT:
+      - Always tailor responses to this specific business
+      - Avoid generic suggestions
+      - Prioritize practical, real-world marketing actions
+    `;
+}

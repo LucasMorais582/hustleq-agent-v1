@@ -85,6 +85,21 @@ model BusinessContext {
   updatedAt       DateTime @updatedAt
 }
 
+model ContentStrategy {
+  id          String   @id @default(uuid())
+  userId      String
+
+  name        String
+  description String?
+
+  pillars     Json     //aqui vai o resultado do prompt
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
 model Integration {
   id           String   @id @default(uuid())
   provider     String

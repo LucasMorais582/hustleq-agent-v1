@@ -39,11 +39,28 @@ export type BusinessContextInput = {
   competitors?: string[];
 };
 
+export type ContentPillar = {
+  name: string;
+  funnelStage: "TOFU" | "MOFU" | "BOFU";
+  why: string;
+  value: string;
+  positioning: string;
+  ideas: string[];
+};
+
+export type ContentStrategyData = {
+  mainPillars: ContentPillar[];
+  extraPillars: {
+    name: string;
+    why: string;
+  }[];
+};
+
 export type AgentInput = {
   userMessage: string;
   instagramData: any;
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContextInput;
-  mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | undefined;
+  mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | "CONTENT_STRATEGY" | undefined;
   history?: HistoryMessage[];
 };
