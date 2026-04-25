@@ -63,4 +63,11 @@ export type AgentInput = {
   businessContext: BusinessContextInput;
   mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | "CONTENT_STRATEGY" | undefined;
   history?: HistoryMessage[];
+  strategy?: any;
+  planConfig?: {
+    period: "week" | "month";
+    staticPerWeek: number;
+    dynamicPerWeek: number;
+    storiesPerWeek: number;
+  };
 };

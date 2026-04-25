@@ -100,6 +100,16 @@ model ContentStrategy {
   @@index([userId])
 }
 
+model ContentPlan {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String?
+  strategyId String?
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Integration {
   id           String   @id @default(uuid())
   provider     String

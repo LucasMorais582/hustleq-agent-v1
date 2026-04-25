@@ -17,6 +17,10 @@ import { BEST_TIME_FORMAT } from "./prompts/format/bestTime.format.js";
 import { CONTENT_STRATEGY_PROMPT } from "./prompts/modes/contentStrategy.prompt.js";
 
 import { buildBusinessContextPrompt } from "../services/businessContext.service.js";
+import { CONTENT_STRATEGY_FORMAT } from "./prompts/format/contentStrategy.format.js";
+import { systemPrompt } from "./prompts/system.prompt.js";
+import { CONTENT_PLAN_PROMPT } from "./prompts/modes/contentPlan.prompt.js";
+import { CONTENT_PLAN_FORMAT } from "./prompts/format/contentPlan.format.js";
 
 function getModePrompt(mode?: string) {
   switch (mode) {
@@ -28,6 +32,8 @@ function getModePrompt(mode?: string) {
       return CAPTION_PROMPT;
     case "CONTENT_STRATEGY":
       return CONTENT_STRATEGY_PROMPT;
+    case "CONTENT_PLAN":
+      return CONTENT_PLAN_PROMPT;
     default:
       return "";
   }
@@ -43,6 +49,10 @@ function getFormatPrompt(mode?: string) {
       return ANALYSIS_FORMAT;
     case "BEST_TIME":
       return BEST_TIME_FORMAT;
+    case "CONTENT_STRATEGY":
+      return CONTENT_STRATEGY_FORMAT;
+    case "CONTENT_PLAN":
+      return CONTENT_PLAN_FORMAT;
     default:
       return ANALYSIS_FORMAT;
   }
@@ -84,19 +94,78 @@ function getGoalInstruction(goal?: string) {
   }
 }
 
+function extractLastOutput(history: any[]) {
+  if (!history || history.length === 0) return null;
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+
+    if (msg.role !== "assistant") continue;
+
+    try {
+      const parsed = JSON.parse(msg.content);
+
+      if (parsed?.type && parsed?.data) {
+        return parsed;
+      }
+
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 export async function runAgent(input: AgentInput) {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
 
   const contextPrompt = buildBusinessContextPrompt(input.businessContext);
+  const strategyPrompt = input.strategy
+      ? `
+    CONTENT STRATEGY:
 
-  const systemPrompt = `
+    You must use the following content pillars:
+
+    ${JSON.stringify(input.strategy.pillars?.mainPillars || [], null, 2)}
+
+    IMPORTANT:
+    - Use exactly 4 pillars
+    - Each week must focus on ONE pillar
+    - Use all pillars across the plan
+    `
+  : "";
+
+  const planConfigPrompt = input.planConfig
+      ? `
+    CONTENT PLAN CONFIGURATION:
+
+    - Period: ${input.planConfig.period}
+
+    You MUST generate:
+    
+    - Static posts per week: ${input.planConfig.staticPerWeek}
+    - Dynamic posts per week: ${input.planConfig.dynamicPerWeek}
+    - Stories per week: ${input.planConfig.storiesPerWeek}
+
+    IMPORTANT:
+    - You MUST strictly follow these numbers
+    - Do NOT generate more or fewer items
+    `
+  : "";
+
+  const finalPrompt = `
     ${BASE_PROMPT}
 
     ${STYLE_PROMPT}
 
     ${contextPrompt}
+
+    ${strategyPrompt}
+
+    ${planConfigPrompt}
 
     ${getModePrompt(input.mode)}
 
@@ -104,32 +173,7 @@ export async function runAgent(input: AgentInput) {
 
     ${getFormatPrompt(input.mode)}
 
-    IMPORTANT:
-
-    You must strictly follow the response format.
-
-    Do NOT include any fields that are not explicitly requested.
-
-    If the mode is CAPTION, return ONLY caption fields.
-    If the mode is IDEAS, return ONLY ideas.
-    If the mode is ANALYSIS, return ONLY analysis fields.
-
-    BUSINESS CONTEXT RULES (CRITICAL):
-
-    - Treat the business context as the user's current understanding, not absolute truth
-    - Do NOT blindly follow it if better alternatives exist
-    - Suggest improvements when relevant
-    - Challenge weak assumptions respectfully
-    - Ask clarifying questions when information is missing or unclear
-    - Provide best-guess outputs when needed and explain what could improve accuracy
-    - Always prioritize real outcomes (leads, sales, conversions) over vanity metrics
-
-    CRITICAL:
-
-    When a JSON format is required:
-    - Return ONLY JSON
-    - Do NOT use markdown
-    - Do NOT wrap in code blocks
+    ${systemPrompt}
   `;
 
   const safeHistory = (input.history || []).map((msg) => ({
@@ -140,8 +184,10 @@ export async function runAgent(input: AgentInput) {
         : JSON.stringify(msg.content),
   }));
 
+  const lastOutput = extractLastOutput(input.history || []);
+
   const messages: ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
+    { role: "system", content: finalPrompt },
 
     ...safeHistory,
 
@@ -151,6 +197,11 @@ export async function runAgent(input: AgentInput) {
         MODE: ${input.mode}
         GOAL: ${input.contentGoal}
 
+        ${lastOutput ? `
+        LAST_OUTPUT:
+        ${JSON.stringify(lastOutput)}
+        ` : ""}
+
         Follow strictly the required JSON format for this mode.
 
         DATA:
@@ -159,7 +210,7 @@ export async function runAgent(input: AgentInput) {
         QUESTION:
         ${input.userMessage}
       `,
-    },
+    }
   ];
 
   const modelMap: any = {
@@ -168,6 +219,7 @@ export async function runAgent(input: AgentInput) {
     ANALYSIS: "gpt-4o",
     BEST_TIME: "gpt-4o",
     CONTENT_STRATEGY: "gpt-4o",
+    CONTENT_PLAN: "gpt-4o",
     PERSONA: "gpt-4o",
     MARKET_INSIGHTS: "gpt-4o"
   };
@@ -178,10 +230,6 @@ export async function runAgent(input: AgentInput) {
     model,
     messages,
     temperature: 0.7,
-  });
-  
-  console.log({
-    tokens: response.usage,
   });
 
   const content = response.choices[0]?.message.content ?? "";
@@ -195,9 +243,52 @@ export async function runAgent(input: AgentInput) {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    console.error("JSON parse failed:", cleaned);
-    parsed = { raw: cleaned };
+    try {
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+
+      const jsonString = cleaned.slice(start, end + 1);
+      parsed = JSON.parse(jsonString);
+    } catch {
+      console.error("JSON parse failed:", cleaned);
+      parsed = { raw: cleaned };
+    }
   }
 
-  return parsed;
+  if (parsed?.ideas) {
+    // modelo voltou formato antigo → corrigimos
+    parsed = {
+      text: "Here are some ideas based on your request.",
+      data: {
+        type: input.mode,
+        data: parsed,
+      },
+    };
+  }
+
+  if (parsed?.text && parsed?.data) {
+    return [
+      {
+        role: "assistant",
+        content: {
+          type: "TEXT",
+          data: {
+            text: parsed.text,
+          },
+        },
+      },
+      {
+        role: "assistant",
+        content: parsed.data,
+      },
+    ];
+  }
+
+  // fallback (caso modelo não siga formato)
+  return [
+    {
+      role: "assistant",
+      content: parsed,
+    },
+  ];
 }

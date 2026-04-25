@@ -16,6 +16,7 @@ import {
   getContentStrategyById,
   listContentStrategies 
 } from "./services/contentStrategy.service.js";
+import { createContentPlan } from "./services/contentPlan.service.js";
 
 const app = express();
 app.use(cors());
@@ -200,6 +201,31 @@ app.delete("/content-strategy/:id", authMiddleware, async (req: any, res: any) =
   }
 });
 
+app.get("/content-plan", authMiddleware, async (req: any, res: any) => {
+  const plans = await prisma.contentPlan.findMany({
+    where: { userId: req.user.userId },
+    orderBy: { createdAt: "desc" }
+  });
+
+  res.json({ plans });
+});
+
+app.post("/content-plan", authMiddleware, async (req: any, res: any) => {
+  try {
+    const { plan, name, strategyId } = req.body;
+
+    const saved = await createContentPlan(req.user.userId, {
+      plan,
+      name,
+      strategyId
+    });
+
+    res.json({ plan: saved });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save plan" });
+  }
+});
+
 app.get("/conversations", authMiddleware,  async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
@@ -305,9 +331,10 @@ app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
 
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
-    const { message, conversationId, mode, contentGoal } = req.body;
+    const { message, conversationId, mode, contentGoal, strategyId, planConfig } = req.body;
 
     let conversation;
+    let strategy = null;
 
     const contextFromDB = await prisma.businessContext.findUnique({
       where: { userId: req.user.userId },
@@ -322,6 +349,16 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
     const dbContext = contextFromDB ? 
     mapContextToAgent(contextFromDB) : fallbackContext;
 
+    if (mode === "CONTENT_PLAN" && strategyId) {
+      strategy = await prisma.contentStrategy.findUnique({
+        where: { id: strategyId },
+      });
+
+      if (!strategy) {
+        return res.status(404).json({ error: "Content strategy not found" });
+      }
+    }
+    
     // 🧠 1. Criar ou buscar conversa
     if (!conversationId) {
       conversation = await prisma.conversation.create({
@@ -376,31 +413,27 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       mode,
       contentGoal,
       businessContext : dbContext,
+      strategy,
+      planConfig,
       instagramData: undefined
     });
 
     // 🧠 5. Salvar resposta
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "assistant",
-        content: JSON.stringify({
-          type: mode,
-          data: response,
-        })
-      },
-    });
+    for (const msg of response) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: "assistant",
+          content: JSON.stringify(msg.content),
+        },
+      });
+    }
 
     // 🧠 6. Retornar resposta + conversationId
     res.json({
-    messages: {
-      content: {
-        type: mode,
-        data: response,
-      }
-    },
-    conversationId: conversation.id,
-  });
+      messages: response,
+      conversationId: conversation.id,
+    });
 
   } catch (error) {
     console.error(error);
