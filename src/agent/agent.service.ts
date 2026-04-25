@@ -58,40 +58,64 @@ function getFormatPrompt(mode?: string) {
   }
 }
 
-function getGoalInstruction(goal?: string) {
-  switch (goal) {
-    case "ENGAGEMENT":
-      return `
-        FOCUS: Engagement
+function getGoalsInstruction(goals?: string[]) {
+  if (!goals || goals.length === 0) return "";
 
-        - Prioritize comments, shares and interaction
-        - Use questions when appropriate
-        - Encourage users to respond
-      `;
-
-    case "CONVERSION":
-      return `
-      FOCUS: Conversion
-
+  const goalDescriptions: Record<string, string> = {
+    ENGAGEMENT: `
+      - Focus on comments, shares and interaction
+      - Use questions when appropriate
+      - Encourage users to respond
+      `,
+          CONVERSION: `
       - Drive action (buy, click, message)
       - Use strong and clear CTA
-      - Highlight value and urgency when relevant
-    `;
-
-    case "EDUCATIONAL":
-      return `
-      FOCUS: Educational
-
+      - Highlight value and urgency
+      `,
+          EDUCATIONAL: `
       - Teach something useful
       - Be clear and structured
       - Deliver value before asking for action
-    `;
+      `,
+          BRAND: `
+      - Strengthen brand perception
+      - Highlight positioning and identity
+      - Build emotional connection
+      `,
+          STORYTELLING: `
+      - Tell relatable or emotional stories
+      - Use narrative structure
+      - Create connection with audience
+      `
+        };
 
-    default:
-      return `
-      FOCUS: General marketing performance
+        return `
+      CONTENT GOALS:
+
+      You must consider the following goals:
+
+      ${goals.map(g => `- ${g}`).join("\n")}
+
+      GOAL EXECUTION RULES:
+
+      ${goals
+        .map(g => `Goal: ${g}\n${goalDescriptions[g] || ""}`)
+        .join("\n")}
+
+      DISTRIBUTION RULE:
+
+      - Each content item should prioritize ONE primary goal
+      - Do NOT try to satisfy all goals in a single post
+      - Across the full plan, ALL goals must be represented
+      - Distribute goals across different posts
+
+      Example:
+
+      Post 1 → ENGAGEMENT  
+      Post 2 → CONVERSION  
+      Post 3 → EDUCATIONAL  
+      Post 4 → BRAND  
     `;
-  }
 }
 
 function extractLastOutput(history: any[]) {
@@ -122,6 +146,13 @@ export async function runAgent(input: AgentInput) {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
+  const goals = input.contentGoals?.length
+    ? input.contentGoals
+    : input.contentGoal
+      ? [input.contentGoal]
+      : [];
+
+  const goalsPrompt = getGoalsInstruction(goals);
   const contextPrompt = buildBusinessContextPrompt(input.businessContext);
   const strategyPrompt = input.strategy
       ? `
@@ -183,7 +214,7 @@ export async function runAgent(input: AgentInput) {
 
     ${getModePrompt(input.mode)}
 
-    ${getGoalInstruction(input.contentGoal)}
+    ${goalsPrompt}
 
     ${getFormatPrompt(input.mode)}
 
@@ -209,12 +240,12 @@ export async function runAgent(input: AgentInput) {
       role: "user",
       content: `
         MODE: ${input.mode}
-        GOAL: ${input.contentGoal}
-
+        GOALS: ${goals.join(", ")} 
+        
         ${lastOutput ? `
-        LAST_OUTPUT:
-        ${JSON.stringify(lastOutput)}
-        ` : ""}
+          LAST_OUTPUT:
+          ${JSON.stringify(lastOutput)}
+          ` : ""}
 
         Follow strictly the required JSON format for this mode.
 

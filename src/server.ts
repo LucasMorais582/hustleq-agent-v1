@@ -339,7 +339,7 @@ app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
 
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
-    const { message, conversationId, mode, contentGoal, strategyId, planConfig } = req.body;
+    const { message, conversationId, mode, contentGoals, strategyId, planConfig } = req.body;
 
     let conversation;
     let strategy = null;
@@ -419,7 +419,7 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       userMessage: message,
       history,
       mode,
-      contentGoal,
+      contentGoals,
       businessContext : dbContext,
       strategy,
       planConfig,

@@ -59,6 +59,7 @@ export type ContentStrategyData = {
 export type AgentInput = {
   userMessage: string;
   instagramData: any;
+  contentGoals?: ("ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING")[];
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContextInput;
   mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | "CONTENT_STRATEGY" | undefined;
