@@ -24,6 +24,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get("/health", (req, res) => {
+  res.send("API running...");
+});
+
 app.get("/auth/me", authMiddleware, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
