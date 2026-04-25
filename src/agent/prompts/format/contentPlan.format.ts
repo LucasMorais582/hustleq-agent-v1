@@ -19,7 +19,8 @@ IMPORTANT:
             "title": "string",
             "description": "string",
             "hook": "string",
-            "goal": "string"
+            "goal": "string",
+            "funnelStage": "TOFU | MOFU | BOFU"
           },
           "caption": {
             "hook": "string",
@@ -41,7 +42,8 @@ IMPORTANT:
             "title": "string",
             "description": "string",
             "hook": "string",
-            "goal": "string"
+            "goal": "string",
+            "funnelStage": "TOFU | MOFU | BOFU"
           },
           "caption": {
             "hook": "string",
