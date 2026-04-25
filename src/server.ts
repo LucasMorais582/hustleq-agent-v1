@@ -19,9 +19,11 @@ import {
 import { createContentPlan } from "./services/contentPlan.service.js";
 
 const app = express();
+
 app.use(cors({
   origin: "*", // depois você restringe
 }));
+
 app.use(express.json());
 
 app.get("/health", (req, res) => {

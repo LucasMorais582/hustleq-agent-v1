@@ -72,7 +72,7 @@
 
     RULES:
 
-    - "text" must be a short natural explanation (1–2 sentences)
+    - "text" must be a short natural explanation (2–3 sentences)
     - "data" must strictly follow the required format for the mode
     - Do NOT add extra fields
     - Do NOT omit any required fields
