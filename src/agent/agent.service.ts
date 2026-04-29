@@ -219,6 +219,13 @@ export async function runAgent(input: AgentInput) {
     ${getFormatPrompt(input.mode)}
 
     ${systemPrompt}
+
+  STRICT FINAL INSTRUCTION:
+
+  - Return ONLY valid JSON
+  - Do NOT include any explanation
+  - Do NOT include any text before or after JSON
+  - If you break this rule, your response is INVALID
   `;
 
   const safeHistory = (input.history || []).map((msg) => ({
@@ -298,6 +305,11 @@ export async function runAgent(input: AgentInput) {
       console.error("JSON parse failed:", cleaned);
       parsed = { raw: cleaned };
     }
+  }
+
+  // Gambiarra para voltar apenas uma semana (quando o modelo insiste em gerar 4, mesmo com instrução clara de gerar 1)
+  if(input.planConfig?.period === "week") {
+    parsed.data.data.weeks ? parsed.data.data.weeks = [parsed.data.data.weeks[0]] : null;
   }
 
   if (parsed?.ideas) {

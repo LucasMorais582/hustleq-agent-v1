@@ -337,6 +337,34 @@ app.get("/conversations/:id/messages", authMiddleware, async (req, res) => {
   }
 });
 
+app.delete("/messages/:id", authMiddleware, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    const message = await prisma.message.findFirst({
+      where: { id },
+      include: {
+        conversation: true,
+      },
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    await prisma.message.delete({
+      where: { id },
+    });
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao deletar mensagem" });
+  }
+});
+
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
     const { message, conversationId, mode, contentGoals, strategyId, planConfig } = req.body;
