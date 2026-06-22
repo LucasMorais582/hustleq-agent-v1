@@ -307,11 +307,6 @@ export async function runAgent(input: AgentInput) {
     }
   }
 
-  // Gambiarra para voltar apenas uma semana (quando o modelo insiste em gerar 4, mesmo com instrução clara de gerar 1)
-  if(input.planConfig?.period === "week") {
-    parsed.data.data.weeks ? parsed.data.data.weeks = [parsed.data.data.weeks[0]] : null;
-  }
-
   if (parsed?.ideas) {
     // modelo voltou formato antigo → corrigimos
     parsed = {
