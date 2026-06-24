@@ -1,78 +1,225 @@
 export const CONTENT_PLAN_FORMAT = `
-OUTPUT FORMAT:
+OUTPUT FORMAT
 
-Return ONLY JSON.
+Return ONLY valid JSON.
 
-IMPORTANT:
-- The arrays MUST contain EXACTLY the number of items defined in the configuration.
-- The example below shows structure only, NOT quantity.
+IMPORTANT
+
+Respect EXACTLY the quantities defined in configuration
+Do NOT generate fewer items
+Do NOT generate more items
+All arrays must match the requested quantity exactly
 
 {
-  "weeks": [
+"weeks": [
+{
+"week": 1,
+"pillar": "string",
+
+  "staticPosts": [
     {
-      "week": 1,
-      "pillar": "string",
+      "idea": {
+        "title": "string",
+        "description": "string",
+        "hook": "string",
+        "goal": "string",
+        "funnelStage": "TOFU | MOFU | BOFU"
+      },
 
-      "staticPosts": [
-        {
-          "idea": {
-            "title": "string",
-            "description": "string",
-            "hook": "string",
-            "goal": "string",
-            "funnelStage": "TOFU | MOFU | BOFU"
-          },
-          "caption": {
-            "hook": "string",
-            "body": "string",
-            "cta": "string",
-            "caption": "string"
-          },
-          "creativeDirection": {
-            "visual": "string",
-            "structure": "string",
-            "execution": "string"
-          }
-        }
-      ],
+      "caption": {
+        "hook": "string",
+        "body": "string",
+        "cta": "string",
+        "caption": "string"
+      },
 
-      "dynamicPosts": [
-        {
-          "idea": {
-            "title": "string",
-            "description": "string",
-            "hook": "string",
-            "goal": "string",
-            "funnelStage": "TOFU | MOFU | BOFU"
-          },
-          "caption": {
-            "hook": "string",
-            "body": "string",
-            "cta": "string",
-            "caption": "string"
-          },
-          "creativeDirection": {
-            "visual": "string",
-            "structure": "string",
-            "execution": "string"
-          }
-        }
-      ],
+      "productionGuidance": {
+        "contentFormat": "string",
+        "narrativeFlow": "string",
+        "productionInstructions": "string",
+        "creatorNotes": "string"
+      },
 
-      "stories": [
-        {
-          "idea": {
-            "title": "string",
-            "description": "string"
-          },
-          "creativeDirection": {
-            "visual": "string",
-            "structure": "string",
-            "execution": "string"
-          }
-        }
-      ]
+      "creativeDirection": {
+        "visualStyle": "string",
+        "composition": "string",
+        "visualElements": "string",
+        "typographyGuidance": "string",
+        "emotionalTone": "string",
+        "executionDetails": "string"
+      }
     }
-  ]
+  ],
+
+  "dynamicPosts": [
+    {
+      "idea": {
+        "title": "string",
+        "description": "string",
+        "hook": "string",
+        "goal": "string",
+        "funnelStage": "TOFU | MOFU | BOFU"
+      },
+
+      "caption": {
+        "hook": "string",
+        "body": "string",
+        "cta": "string",
+        "caption": "string"
+      },
+
+      "productionGuidance": {
+        "contentFormat": "string",
+        "narrativeFlow": "string",
+        "productionInstructions": "string",
+        "creatorNotes": "string"
+      },
+
+      "creativeDirection": {
+        "visualStyle": "string",
+        "composition": "string",
+        "visualElements": "string",
+        "typographyGuidance": "string",
+        "emotionalTone": "string",
+        "executionDetails": "string"
+      }
+    }
+  ],
+
+  "stories": [
+    {
+      "idea": {
+        "title": "string",
+        "description": "string"
+      },
+
+      "productionGuidance": {
+        "contentFormat": "string",
+        "narrativeFlow": "string",
+        "productionInstructions": "string",
+        "creatorNotes": "string"
+      },
+
+      "creativeDirection": {
+        "visualStyle": "string",
+        "composition": "string",
+        "visualElements": "string",
+        "typographyGuidance": "string",
+        "emotionalTone": "string",
+        "executionDetails": "string"
+      }
+    }
+  ],
+
+  "executionRequirements": {
+    "summary": "string",
+    "requirements": ["string"],
+    "importantNotes": ["string"]
+  }
+}
+
+],
+
+"backupContent": {
+"staticPosts": [
+{
+"idea": {
+"title": "string",
+"description": "string",
+"hook": "string",
+"goal": "string",
+"funnelStage": "TOFU | MOFU | BOFU"
+},
+
+    "caption": {
+      "hook": "string",
+      "body": "string",
+      "cta": "string",
+      "caption": "string"
+    },
+
+    "productionGuidance": {
+      "contentFormat": "string",
+      "narrativeFlow": "string",
+      "productionInstructions": "string",
+      "creatorNotes": "string"
+    },
+
+    "creativeDirection": {
+      "visualStyle": "string",
+      "composition": "string",
+      "visualElements": "string",
+      "typographyGuidance": "string",
+      "emotionalTone": "string",
+      "executionDetails": "string"
+    }
+  }
+],
+
+"dynamicPosts": [
+  {
+    "idea": {
+      "title": "string",
+      "description": "string",
+      "hook": "string",
+      "goal": "string",
+      "funnelStage": "TOFU | MOFU | BOFU"
+    },
+
+    "caption": {
+      "hook": "string",
+      "body": "string",
+      "cta": "string",
+      "caption": "string"
+    },
+
+    "productionGuidance": {
+      "contentFormat": "string",
+      "narrativeFlow": "string",
+      "productionInstructions": "string",
+      "creatorNotes": "string"
+    },
+
+    "creativeDirection": {
+      "visualStyle": "string",
+      "composition": "string",
+      "visualElements": "string",
+      "typographyGuidance": "string",
+      "emotionalTone": "string",
+      "executionDetails": "string"
+    }
+  }
+],
+
+"stories": [
+  {
+    "idea": {
+      "title": "string",
+      "description": "string"
+    },
+
+    "productionGuidance": {
+      "contentFormat": "string",
+      "narrativeFlow": "string",
+      "productionInstructions": "string",
+      "creatorNotes": "string"
+    },
+
+    "creativeDirection": {
+      "visualStyle": "string",
+      "composition": "string",
+      "visualElements": "string",
+      "typographyGuidance": "string",
+      "emotionalTone": "string",
+      "executionDetails": "string"
+    }
+  }
+],
+  "executionRequirements": {
+    "summary": "string",
+    "requirements": ["string"],
+    "importantNotes": ["string"]
+  }
+}
 }
 `;
