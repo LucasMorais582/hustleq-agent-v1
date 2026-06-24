@@ -29,6 +29,42 @@ export async function runAgent(input: AgentInput) {
   const contextPrompt = buildBusinessContextPrompt(input.businessContext);
   const strategyPrompt = getStrategyPrompt(input);
   const planConfigPrompt = getPlanConfigPrompt(input);
+  const modePrompt = getModePrompt(input.mode);
+  const formatPrompt = getFormatPrompt(input.mode);
+  let extraContext = "";
+
+  if (input.mode === "CONTENT_PLAN_WEEK") {
+    extraContext = `
+    WEEK NUMBER: ${input.weekNumber}
+
+    MONTHLY STRATEGY:
+    ${JSON.stringify(input.monthlyOverview)}
+    
+    PREVIOUS GENERATED WEEKS:
+    ${JSON.stringify(input.generatedWeeks || [])}
+  
+    `;  
+  }
+
+  else if (input.mode === "CONTENT_PLAN_MODIFICATION") {
+    extraContext = `
+    PREVIOUS WEEK:
+    ${JSON.stringify(input.previousWeek)}
+
+    USER REQUEST:
+    ${input.userFeedback}
+    `;
+  }
+
+  else if (input.mode === "CONTENT_PLAN_OVERVIEW") {
+    extraContext = `
+    Generate monthly content strategy based on the selected content strategy.
+
+    SELECTED STRATEGY:
+
+    ${JSON.stringify(input.strategy)}
+    `;
+  }
 
   const finalPrompt = `
     ${BASE_PROMPT}
@@ -41,11 +77,13 @@ export async function runAgent(input: AgentInput) {
 
     ${planConfigPrompt}
 
-    ${getModePrompt(input.mode)}
+    ${modePrompt}
+
+    ${extraContext}
 
     ${goalsPrompt}
 
-    ${getFormatPrompt(input.mode)}
+    ${formatPrompt}
 
     ${systemPrompt}
 
@@ -67,10 +105,19 @@ export async function runAgent(input: AgentInput) {
 
   const lastOutput = extractLastOutput(input.history || []);
 
+    const contentPlanModes = [
+    "CONTENT_PLAN_OVERVIEW",
+    "CONTENT_PLAN_WEEK",
+    "CONTENT_PLAN_MODIFICATION",
+    "CONTENT_PLAN_BACKUP"
+  ];
+
+  const shouldIgnoreHistory = contentPlanModes.includes(input.mode as string);
+
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: finalPrompt },
 
-    ...safeHistory,
+    ...(shouldIgnoreHistory ? [] : safeHistory),
 
     {
       role: "user",
@@ -101,6 +148,10 @@ export async function runAgent(input: AgentInput) {
     BEST_TIME: "gpt-4o",
     CONTENT_STRATEGY: "gpt-4o",
     CONTENT_PLAN: "gpt-4o",
+    CONTENT_PLAN_OVERVIEW: "gpt-4o",
+    CONTENT_PLAN_WEEK: "gpt-4o",
+    CONTENT_PLAN_MODIFICATION: "gpt-4o",
+    CONTENT_PLAN_BACKUP: "gpt-4o",
     PERSONA: "gpt-4o",
     MARKET_INSIGHTS: "gpt-4o"
   };

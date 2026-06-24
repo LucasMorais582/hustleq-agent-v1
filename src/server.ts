@@ -367,7 +367,19 @@ app.delete("/messages/:id", authMiddleware, async (req: any, res: any) => {
 
 app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
   try {
-    const { message, conversationId, mode, contentGoals, strategyId, planConfig } = req.body;
+    const { 
+      message,
+      conversationId,
+      mode,
+      contentGoals,
+      strategyId,
+      planConfig,
+      weekNumber,
+      monthlyOverview,
+      previousWeek,
+      userFeedback,
+      generatedWeeks,
+    } = req.body;
 
     let conversation;
     let strategy = null;
@@ -385,7 +397,14 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
     const dbContext = contextFromDB ? 
     mapContextToAgent(contextFromDB) : fallbackContext;
 
-    if (mode === "CONTENT_PLAN" && strategyId) {
+    const contentPlanModes = [
+      "CONTENT_PLAN_OVERVIEW",
+      "CONTENT_PLAN_WEEK",
+      "CONTENT_PLAN_MODIFICATION",
+      "CONTENT_PLAN_BACKUP"
+    ];
+
+    if ((mode === "CONTENT_PLAN" || contentPlanModes.includes(mode)) && strategyId) {
       strategy = await prisma.contentStrategy.findUnique({
         where: { id: strategyId },
       });
@@ -451,7 +470,12 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
       businessContext : dbContext,
       strategy,
       planConfig,
-      instagramData: undefined
+      instagramData: undefined,
+      weekNumber,
+      monthlyOverview,
+      previousWeek,
+      userFeedback,
+      generatedWeeks,
     });
 
     // 🧠 5. Salvar resposta
