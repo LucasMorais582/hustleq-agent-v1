@@ -49,6 +49,50 @@ Do NOT generate more items.
 
 ---
 
+MANDATORY GENERATION LOOP
+
+You must generate content iteratively.
+
+For EACH content type:
+
+STEP 1
+
+Generate the first item.
+
+STEP 2
+
+Check current array length.
+
+STEP 3
+
+If current array length is smaller than required quantity, continue generating additional complete items.
+
+STEP 4
+
+Repeat until exact quantity is reached.
+
+You MUST repeat this process separately for:
+
+- staticPosts
+- dynamicPosts
+- stories
+
+IMPORTANT:
+
+If staticPosts required quantity = 3
+
+Then staticPosts array MUST contain EXACTLY 3 FULL objects.
+
+Returning only one object is INVALID.
+
+Returning fewer objects than requested is INVALID.
+
+Do NOT stop generation early.
+
+One object is NEVER enough unless requested quantity = 1.
+
+---
+
 CONTENT STRUCTURE
 
 Each post must include:
@@ -116,4 +160,40 @@ Generate ONLY one week.
 Do NOT generate backup content.
 
 Do NOT generate multiple weeks.
+
+---
+
+FINAL VALIDATION BEFORE RETURNING
+
+Before returning your response, you MUST validate:
+
+1.
+
+staticPosts array length MUST equal exactly {staticPerWeek}
+
+2.
+
+dynamicPosts array length MUST equal exactly {dynamicPerWeek}
+
+3.
+
+stories array length MUST equal exactly {storiesPerWeek}
+
+Validation examples:
+
+If staticPerWeek = 3
+
+Then staticPosts.length MUST equal 3.
+
+If current array length is smaller than required quantity:
+
+Continue generating until quantity is reached.
+
+DO NOT return incomplete arrays.
+
+If any array contains fewer items than required:
+
+Your response is INVALID.
+
+You MUST fix the response before returning.
 `;

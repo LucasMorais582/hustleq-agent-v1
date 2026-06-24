@@ -161,7 +161,7 @@ export async function runAgent(input: AgentInput) {
   const response = await openai.chat.completions.create({
     model,
     messages,
-    temperature: 0.7,
+    temperature: 0.3,
   });
 
   const content = response.choices[0]?.message.content ?? "";

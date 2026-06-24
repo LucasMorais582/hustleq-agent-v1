@@ -55,7 +55,8 @@ The response MUST follow EXACTLY this structure:
             "emotionalTone": "string",
             "executionDetails": "string"
           }
-        }
+        },
+        { ... additional items until required quantity is reached }
       ],
 
       "dynamicPosts": [
@@ -90,7 +91,8 @@ The response MUST follow EXACTLY this structure:
             "emotionalTone": "string",
             "executionDetails": "string"
           }
-        }
+        },
+        { ... additional items until required quantity is reached }
       ],
 
       "stories": [
@@ -115,7 +117,8 @@ The response MUST follow EXACTLY this structure:
             "emotionalTone": "string",
             "executionDetails": "string"
           }
-        }
+        },
+        { ... additional items until required quantity is reached }
       ],
 
       "executionRequirements": {

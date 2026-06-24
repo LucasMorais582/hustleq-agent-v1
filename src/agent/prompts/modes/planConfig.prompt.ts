@@ -21,10 +21,32 @@ export function getPlanConfigPrompt(input?: any) {
     - Backup dynamic posts: ${backupDynamicPosts}
     - Backup stories: ${backupStories}
 
-    IMPORTANT:
-    - You MUST strictly follow these numbers
-    - Do NOT generate more or fewer items
-    `
+    CRITICAL VALIDATION RULE
+
+    These quantities are mandatory.
+
+    You MUST generate EXACTLY these numbers.
+
+    Examples:
+
+    If static posts per week = 3
+
+    The staticPosts array MUST contain exactly 3 complete objects.
+
+    If dynamic posts per week = 2
+
+    The dynamicPosts array MUST contain exactly 2 complete objects.
+
+    If stories per week = 4
+
+    The stories array MUST contain exactly 4 complete objects.
+
+    Returning fewer items is INVALID.
+
+    Returning more items is INVALID.
+
+    You must count every array before returning.
+  `
   : "";
 
     return planConfigPrompt;
