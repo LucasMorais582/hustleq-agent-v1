@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 
-import { runAgent } from "./agent/agent.service.js";
+import { runAgent } from "./agent/runAgent.js";
 import { prisma } from "./lib/prisma.js";
 import { generateToken } from "./lib/auth.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
@@ -397,14 +397,16 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
     const dbContext = contextFromDB ? 
     mapContextToAgent(contextFromDB) : fallbackContext;
 
-    const contentPlanModes = [
-      "CONTENT_PLAN_OVERVIEW",
-      "CONTENT_PLAN_WEEK",
-      "CONTENT_PLAN_MODIFICATION",
-      "CONTENT_PLAN_BACKUP"
-    ];
+   const strategyModes = [
+    "CONTENT_PLAN",
+    "CONTENT_PLAN_OVERVIEW",
+    "CONTENT_PLAN_WEEK",
+    "CONTENT_PLAN_MODIFICATION",
+    "CONTENT_PLAN_BACKUP",
+    "CONTENT_PLAN_WEEK_V3"
+  ];
 
-    if ((mode === "CONTENT_PLAN" || contentPlanModes.includes(mode)) && strategyId) {
+    if ((strategyModes.includes(mode)) && strategyId) {
       strategy = await prisma.contentStrategy.findUnique({
         where: { id: strategyId },
       });
@@ -460,6 +462,9 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
         content: message,
       },
     });
+
+    console.log("SERVER STRATEGY:");
+    console.log(JSON.stringify(strategy, null, 2));
 
     // 🧠 4. Rodar agente
     const response = await runAgent({

@@ -1,32 +1,33 @@
 export function getStrategyPrompt(input?: any) {
-    const strategyPrompt = input.strategy
-      ? `
-    CONTENT STRATEGY:
+  if (!input?.strategy) return "";
 
-    You must use the following content pillars:
+  return `
+  CONTENT STRATEGY:
 
-    ${JSON.stringify(input.strategy.pillars?.mainPillars || [], null, 2)}
+  Use the following strategic pillars as inspiration:
 
-    IMPORTANT:
+  ${JSON.stringify(
+    input.strategy.pillars?.mainPillars || [],
+    null,
+    2
+  )}
 
-    - You have 4 content pillars
-    - You MUST generate EXACTLY 4 weeks (if period = month)
+  IMPORTANT:
 
-    PILLAR DISTRIBUTION RULE:
+  This content plan is NOT organized by assigning one pillar per week.
 
-    - Each week MUST be assigned ONE primary pillar
-    - Across the 4 weeks, you MUST use ALL 4 pillars exactly once
-    - Do NOT stop after generating one week
-    - Continue until all 4 weeks are created
+  Different weeks should combine multiple strategic pillars.
 
-    Example:
+  Content variety is extremely important.
 
-    Week 1 → Pillar A  
-    Week 2 → Pillar B  
-    Week 3 → Pillar C  
-    Week 4 → Pillar D  
-        `
-      : "";
+  Different posts inside the same week should explore different business angles.
 
-    return strategyPrompt;
+  You should use the strategy as creative guidance, NOT as a rigid weekly structure.
+
+  PRIORITIES:
+
+  - Avoid repetitive topics
+  - Mix awareness, engagement, authority, and conversion angles
+  - Use different pillars naturally across content generation
+  `;
 }

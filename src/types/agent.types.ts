@@ -62,7 +62,20 @@ export type AgentInput = {
   contentGoals?: ("ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING")[];
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContextInput;
-  mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | "CONTENT_STRATEGY" | "CONTENT_PLAN_WEEK" | "CONTENT_PLAN_MODIFICATION" | "CONTENT_PLAN_OVERVIEW" | undefined;
+  mode?: 
+    "IDEAS" |
+    "ANALYSIS" |
+    "CAPTION" |
+    "BEST_TIME" |
+    "PERSONA" |
+    "MARKET_INSIGHTS" |
+    "CONTENT_STRATEGY" |
+    "CONTENT_PLAN_WEEK" |
+    "CONTENT_PLAN_MODIFICATION" |
+    "CONTENT_PLAN_OVERVIEW" |
+    "CONTENT_WEEK_BLUEPRINT" |
+    "CONTENT_SINGLE_POST" |
+    undefined;
   history?: HistoryMessage[];
   strategy?: any;
   planConfig?: {
@@ -76,4 +89,6 @@ export type AgentInput = {
   previousWeek?: any;
   userFeedback?: string;
   generatedWeeks?: any[];
+  monthlyStrategy?: any; 
+  blueprintItem?: any;
 };
