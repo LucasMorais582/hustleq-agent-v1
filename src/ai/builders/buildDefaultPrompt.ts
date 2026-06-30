@@ -1,36 +1,28 @@
 import type { AgentInput } from "../../types/agent.types.js";
 
-import { BASE_PROMPT }
-from "../../agent/prompts/base.prompt.js";
+import { BASE_PROMPT } from "../prompts/base.prompt.js";
+import { STYLE_PROMPT } from "../prompts/style.prompt.js";
+import { systemPrompt } from "../prompts/system.prompt.js";
 
-import { STYLE_PROMPT }
-from "../../agent/prompts/style.prompt.js";
+import { buildBusinessContextPrompt } from "../../services/businessContext.service.js";
 
-import { buildBusinessContextPrompt }
-from "../businessContext.service.js";
-
-import { systemPrompt }
-from "../../agent/prompts/system.prompt.js";
-
-import { getStrategyPrompt }
-from "../../agent/prompts/modes/strategy.prompt.js";
+import { getStrategyPrompt } from "../prompts/modes/strategy.prompt.js";
 
 import {
   getModePrompt,
   getFormatPrompt
-}
-from "../../utils/prompt.utils.js";
+} from "../prompts/promptRegistry.js";
 
 import { getPlanConfigPrompt }
-from "../../agent/prompts/modes/planConfig.prompt.js";
+from "../prompts/modes/planConfig.prompt.js";
 
 import { getGoalsInstructionPrompt }
-from "../../agent/prompts/modes/goals.prompt.js";
+from "../prompts/modes/goals.prompt.js";
 
 import { getExtraContext }
 from "./getExtraContext.js";
 
-export function buildFinalPrompt(
+export function buildDefaultPrompt(
   input: AgentInput
 ) {
   const goals =
@@ -55,7 +47,7 @@ export function buildFinalPrompt(
     getPlanConfigPrompt(input);
 
   const modePrompt =
-    getModePrompt(input.mode);
+    getModePrompt(input);
 
   const formatPrompt =
     getFormatPrompt(input.mode);

@@ -7,20 +7,30 @@ from "./generateWeekBlueprint.js";
 import { generateSinglePost }
 from "./generateSinglePost.js";
 
+import { validateWeekPipeline }
+from "../validators/validateWeekPipeline.js";
+
 export async function generateWeekPipeline(
   input: AgentInput
 ) {
   /*
     STEP 1
   */
-  console.log("PIPELINE INPUT:");
-  console.log(JSON.stringify(input, null, 2));
   const blueprint = await generateWeekBlueprint(input);
   if (!blueprint || !blueprint.blueprint || !Array.isArray(blueprint.blueprint)) {
     throw new Error(
       "Invalid blueprint response"
     );
   }
+
+  console.log(
+    "BLUEPRINT GENERATED:",
+    JSON.stringify(
+      blueprint,
+      null,
+      2
+    )
+  );
 
   /*
     STEP 2
@@ -64,13 +74,19 @@ export async function generateWeekPipeline(
       (p) => p.contentType === "story"
     );
 
-  return {
+  const week = {
     week: input.weekNumber,
-
     staticPosts,
-
     dynamicPosts,
-
     stories,
   };
+
+  const isValid = validateWeekPipeline(week, input.planConfig);
+  if (!isValid) {
+    throw new Error(
+      "Generated week pipeline is invalid"
+    );
+  }
+
+  return week;
 }

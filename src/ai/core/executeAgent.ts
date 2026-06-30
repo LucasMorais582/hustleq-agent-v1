@@ -1,15 +1,7 @@
-import { generateCompletion }
-from "./generateCompletion.service.js";
-
-import { formatAgentResponse }
-from "./formatAgentResponse.js";
-
-import type {
-  ChatCompletionMessageParam
-} from "openai/resources";
-
-import { temperatureRouter }
-from "./temperatureRouter.js";
+import { generateCompletion } from "./generateCompletion.service.js";
+import { formatAgentResponse } from "../formatting/formatAgentResponse.js";
+import type { ChatCompletionMessageParam } from "openai/resources";
+import { temperatureRouter } from "./temperatureRouter.js";
 
 type ExecuteAgentInput = {
   messages: ChatCompletionMessageParam[];
@@ -25,13 +17,6 @@ export async function executeAgent({
 
   const temperature =
     temperatureRouter(mode);
-
-  console.log(
-    "EXECUTING:",
-    mode,
-    "TEMP:",
-    temperature
-  );
 
   const parsed =
     await generateCompletion({

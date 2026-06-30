@@ -1,5 +1,5 @@
 import type { ChatCompletionMessageParam } from "openai/resources";
-import { callOpenAI } from "../openai/callOpenAI.js";
+import { callOpenAI } from "./callOpenAI.js";
 
 type GenerateCompletionInput = {
   messages: ChatCompletionMessageParam[];

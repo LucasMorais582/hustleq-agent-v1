@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 
-import { runAgent } from "./agent/runAgent.js";
+import { runAgent } from "./ai/orchestrator/dukeOrchestrator.js";
 import { prisma } from "./lib/prisma.js";
 import { generateToken } from "./lib/auth.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
@@ -16,7 +16,6 @@ import {
   getContentStrategyById,
   listContentStrategies 
 } from "./services/contentStrategy.service.js";
-import { createContentPlan } from "./services/contentPlan.service.js";
 
 const app = express();
 
@@ -206,31 +205,6 @@ app.delete("/content-strategy/:id", authMiddleware, async (req: any, res: any) =
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao deletar estratégia" });
-  }
-});
-
-app.get("/content-plan", authMiddleware, async (req: any, res: any) => {
-  const plans = await prisma.contentPlan.findMany({
-    where: { userId: req.user.userId },
-    orderBy: { createdAt: "desc" }
-  });
-
-  res.json({ plans });
-});
-
-app.post("/content-plan", authMiddleware, async (req: any, res: any) => {
-  try {
-    const { plan, name, strategyId } = req.body;
-
-    const saved = await createContentPlan(req.user.userId, {
-      plan,
-      name,
-      strategyId
-    });
-
-    res.json({ plan: saved });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to save plan" });
   }
 });
 
@@ -462,9 +436,6 @@ app.post("/agent/chat", authMiddleware, async (req: any, res: any) => {
         content: message,
       },
     });
-
-    console.log("SERVER STRATEGY:");
-    console.log(JSON.stringify(strategy, null, 2));
 
     // 🧠 4. Rodar agente
     const response = await runAgent({

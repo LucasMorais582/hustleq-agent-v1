@@ -1,5 +1,5 @@
 import type { AgentInput }
-from "../../../types/agent.types.js";
+from "../../types/agent.types.js";
 
 import { buildDefaultPrompt }
 from "./buildDefaultPrompt.js";

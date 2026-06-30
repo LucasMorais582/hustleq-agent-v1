@@ -1,13 +1,13 @@
-import type { AgentInput } from "../../../types/agent.types.js";
+import type { AgentInput } from "../../types/agent.types.js";
 
 import { buildBusinessContextPrompt }
-from "../../businessContext.service.js";
+from "../../services/businessContext.service.js";
 
 import {
   getModePrompt,
   getFormatPrompt
 }
-from "../../../utils/prompt.utils.js";
+from "../prompts/promptRegistry.js";
 
 export function buildSinglePostPrompt(
   input: AgentInput | any
@@ -19,6 +19,7 @@ export function buildSinglePostPrompt(
 
   const modePrompt =
     getModePrompt(
+      undefined,
       "CONTENT_SINGLE_POST"
     );
 

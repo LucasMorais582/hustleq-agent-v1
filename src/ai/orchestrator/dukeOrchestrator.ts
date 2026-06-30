@@ -1,14 +1,11 @@
-import type { AgentInput } from "../types/agent.types.js";
-import { generateWeekPipeline } from "../services/agent/generateWeekPipeline.js";
-import { promptRouter } from "../services/agent/builders/promptRouter.js";
-import { buildAgentMessages } from "../services/agent/buildAgentMessages.js";
-import { executeAgent } from "../services/agent/executeAgent.js";
+import type { AgentInput } from "../../types/agent.types.js";
+import { generateWeekPipeline } from "../pipeline/generateWeekPipeline.js";
+import { promptRouter } from "../builders/promptRouter.js";
+import { buildAgentMessages } from "../builders/buildAgentMessages.js";
+import { executeAgent } from "../core/executeAgent.js";
 
 export async function runAgent(input: AgentInput | any) {
   if (input.mode === "CONTENT_PLAN_WEEK_V3") {
-    console.log("RUN AGENT INPUT:");
-    console.log(JSON.stringify(input, null, 2));
-
     const week: any =
       await generateWeekPipeline(input);
 

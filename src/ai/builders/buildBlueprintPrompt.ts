@@ -1,19 +1,19 @@
-import type { AgentInput } from "../../../types/agent.types.js";
+import type { AgentInput } from "../../types/agent.types.js";
 
 import { BASE_PROMPT }
-from "../../../agent/prompts/base.prompt.js";
+from "../prompts/base.prompt.js";
 
 import { buildBusinessContextPrompt }
-from "../../businessContext.service.js";
+from "../../services/businessContext.service.js";
 
 import {
   getModePrompt,
   getFormatPrompt
 }
-from "../../../utils/prompt.utils.js";
+from "../prompts/promptRegistry.js";
 
 import { getStrategyPrompt }
-from "../../../agent/prompts/modes/strategy.prompt.js";
+from "../prompts/modes/strategy.prompt.js";
 
 export function buildBlueprintPrompt(
   input: AgentInput
@@ -27,9 +27,7 @@ export function buildBlueprintPrompt(
     getStrategyPrompt(input);
 
   const modePrompt =
-    getModePrompt(
-      "CONTENT_WEEK_BLUEPRINT"
-    );
+    getModePrompt(input);
 
   const formatPrompt =
     getFormatPrompt(
