@@ -40,9 +40,11 @@ export function buildAgentMessages(
     shouldIgnoreHistory(input);
 
   const internalModes = [
-  "CONTENT_WEEK_BLUEPRINT",
-  "CONTENT_SINGLE_POST"
-];
+    "CONTENT_WEEK_BLUEPRINT",
+    "CONTENT_SINGLE_POST",
+    "CONTENT_POST_CONCEPT",
+    "CONTENT_POST_EXECUTION"
+  ];
 
   /*
     Internal pipeline calls

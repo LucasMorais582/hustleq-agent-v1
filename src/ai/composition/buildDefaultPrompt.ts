@@ -1,12 +1,19 @@
 import type { AgentInput } from "../../types/agent.types.js";
 
-import { BASE_PROMPT } from "../prompts/base.prompt.js";
-import { STYLE_PROMPT } from "../prompts/style.prompt.js";
-import { systemPrompt } from "../prompts/system.prompt.js";
+import { BASE_PROMPT }
+from "../prompts/shared/base.prompt.js";
 
-import { buildBusinessContextPrompt } from "../../services/businessContext.service.js";
+import { STYLE_PROMPT }
+from "../prompts/shared/style.prompt.js";
 
-import { getStrategyPrompt } from "../prompts/modes/strategy.prompt.js";
+import { systemPrompt }
+from "../prompts/shared/system.prompt.js";
+
+import { buildBusinessContextPrompt }
+from "../../services/businessContext.service.js";
+
+import { getStrategyPrompt }
+from "../prompts/layers/strategy.prompt.js";
 
 import {
   getModePrompt,
@@ -14,13 +21,16 @@ import {
 } from "../prompts/promptRegistry.js";
 
 import { getPlanConfigPrompt }
-from "../prompts/modes/planConfig.prompt.js";
+from "../prompts/layers/planConfig.prompt.js";
 
 import { getGoalsInstructionPrompt }
-from "../prompts/modes/goals.prompt.js";
+from "../prompts/layers/goals.prompt.js";
 
 import { getExtraContext }
 from "./getExtraContext.js";
+
+import { promptComposer }
+from "./promptComposer.js";
 
 export function buildDefaultPrompt(
   input: AgentInput
@@ -55,31 +65,18 @@ export function buildDefaultPrompt(
   const extraContext =
     getExtraContext(input);
 
-  return `
-    ${BASE_PROMPT}
-
-    ${STYLE_PROMPT}
-
-    ${contextPrompt}
-
-    ${strategyPrompt}
-
-    ${planConfigPrompt}
-
-    ${modePrompt}
-
-    ${extraContext}
-
-    ${goalsPrompt}
-
-    ${formatPrompt}
-
-    ${systemPrompt}
-
-    STRICT FINAL INSTRUCTION:
-
-    - Return ONLY valid JSON
-    - Do NOT include any explanation
-    - Do NOT include any text before or after JSON
-  `;
+  return promptComposer({
+    sections: [
+      BASE_PROMPT,
+      STYLE_PROMPT,
+      contextPrompt,
+      strategyPrompt,
+      planConfigPrompt,
+      modePrompt,
+      extraContext,
+      goalsPrompt,
+      formatPrompt,
+      systemPrompt,
+    ]
+  });
 }

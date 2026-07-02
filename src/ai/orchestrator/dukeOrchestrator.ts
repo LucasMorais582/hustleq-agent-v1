@@ -1,7 +1,7 @@
 import type { AgentInput } from "../../types/agent.types.js";
 import { generateWeekPipeline } from "../pipeline/generateWeekPipeline.js";
-import { promptRouter } from "../builders/promptRouter.js";
-import { buildAgentMessages } from "../builders/buildAgentMessages.js";
+import { promptRouter } from "../composition/promptRouter.js";
+import { buildAgentMessages } from "../composition/buildAgentMessages.js";
 import { executeAgent } from "../core/executeAgent.js";
 
 export async function runAgent(input: AgentInput | any) {

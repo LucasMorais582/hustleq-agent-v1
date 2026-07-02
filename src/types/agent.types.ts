@@ -75,6 +75,8 @@ export type AgentInput = {
     "CONTENT_PLAN_OVERVIEW" |
     "CONTENT_WEEK_BLUEPRINT" |
     "CONTENT_SINGLE_POST" |
+    "CONTENT_POST_CONCEPT" | 
+    "CONTENT_POST_EXECUTION"|
     undefined;
   history?: HistoryMessage[];
   strategy?: any;
@@ -91,4 +93,8 @@ export type AgentInput = {
   generatedWeeks?: any[];
   monthlyStrategy?: any; 
   blueprintItem?: any;
+};
+
+export type PromptComposerInput = {
+  sections: string[];
 };

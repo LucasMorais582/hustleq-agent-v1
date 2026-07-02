@@ -1,4 +1,5 @@
-import type { AgentInput } from "../../types/agent.types.js";
+import type { AgentInput }
+from "../../types/agent.types.js";
 
 import { buildBusinessContextPrompt }
 from "../../services/businessContext.service.js";
@@ -9,7 +10,10 @@ import {
 }
 from "../prompts/promptRegistry.js";
 
-export function buildSinglePostPrompt(
+import { promptComposer }
+from "./promptComposer.js";
+
+export function buildPostConceptPrompt(
   input: AgentInput | any
 ) {
   const contextPrompt =
@@ -20,17 +24,15 @@ export function buildSinglePostPrompt(
   const modePrompt =
     getModePrompt(
       undefined,
-      "CONTENT_SINGLE_POST"
+      "CONTENT_POST_CONCEPT"
     );
 
   const formatPrompt =
     getFormatPrompt(
-      "CONTENT_SINGLE_POST"
+      "CONTENT_POST_CONCEPT"
     );
 
-  return `
-    ${contextPrompt}
-
+  const extraContext = `
     CONTENT BLUEPRINT:
 
     ${JSON.stringify(
@@ -38,13 +40,14 @@ export function buildSinglePostPrompt(
       null,
       2
     )}
-
-    ${modePrompt}
-
-    ${formatPrompt}
-
-    STRICT FINAL INSTRUCTION:
-
-    Return ONLY valid JSON.
   `;
+
+  return promptComposer({
+    sections: [
+      contextPrompt,
+      extraContext,
+      modePrompt,
+      formatPrompt,
+    ]
+  });
 }

@@ -1,8 +1,5 @@
 import type { AgentInput } from "../../types/agent.types.js";
 
-import { BASE_PROMPT }
-from "../prompts/base.prompt.js";
-
 import { buildBusinessContextPrompt }
 from "../../services/businessContext.service.js";
 
@@ -13,7 +10,10 @@ import {
 from "../prompts/promptRegistry.js";
 
 import { getStrategyPrompt }
-from "../prompts/modes/strategy.prompt.js";
+from "../prompts/layers/strategy.prompt.js";
+
+import { promptComposer }
+from "./promptComposer.js";
 
 export function buildBlueprintPrompt(
   input: AgentInput
@@ -34,19 +34,12 @@ export function buildBlueprintPrompt(
       "CONTENT_WEEK_BLUEPRINT"
     );
 
-  return `
-    ${BASE_PROMPT}
-
-    ${contextPrompt}
-
-    ${strategyPrompt}
-
-    ${modePrompt}
-
-    ${formatPrompt}
-
-    STRICT FINAL INSTRUCTION:
-
-    Return ONLY valid JSON.
-  `;
+  return promptComposer({
+      sections: [
+        contextPrompt,
+        strategyPrompt,
+        modePrompt,
+        formatPrompt,
+      ]
+    });
 }

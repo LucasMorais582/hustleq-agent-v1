@@ -1,8 +1,4 @@
 export function getPlanConfigPrompt(input?: any) {
-  const backupStaticPosts = input.planConfig? Math.max(1, Math.ceil(input.planConfig.staticPerWeek / 2)) : 2;
-  const backupDynamicPosts = input.planConfig ? Math.max(1, Math.ceil(input.planConfig.dynamicPerWeek / 2)) : 1;
-  const backupStories = input.planConfig ? Math.max(1, Math.ceil(input.planConfig.storiesPerWeek / 2)) : 3;
-  
   const planConfigPrompt = input.planConfig
       ? `
     CONTENT PLAN CONFIGURATION:
@@ -17,9 +13,9 @@ export function getPlanConfigPrompt(input?: any) {
 
     You MUST generate in the content backup section (if period = month):
 
-    - Backup static posts: ${backupStaticPosts}
-    - Backup dynamic posts: ${backupDynamicPosts}
-    - Backup stories: ${backupStories}
+    - Backup static posts: ${input.planConfig.staticPerWeek}
+    - Backup dynamic posts: ${input.planConfig.dynamicPerWeek}
+    - Backup stories: ${input.planConfig.storiesPerWeek}
 
     CRITICAL VALIDATION RULE
 

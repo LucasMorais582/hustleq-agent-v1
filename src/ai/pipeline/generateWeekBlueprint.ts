@@ -1,8 +1,8 @@
 import type { AgentInput } from "../../types/agent.types.js";
 
-import { promptRouter } from "../builders/promptRouter.js";
+import { promptRouter } from "../composition/promptRouter.js";
 
-import { buildAgentMessages }from "../builders/buildAgentMessages.js";
+import { buildAgentMessages }from "../composition/buildAgentMessages.js";
 
 import { executeAgent } from "../core/executeAgent.js";
 import { retryWeekBlueprint }

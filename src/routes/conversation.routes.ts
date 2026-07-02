@@ -5,15 +5,15 @@ import {
 } from "../middleware/auth.middleware.js";
 
 import {
-  createStrategyController,
-  getStrategiesController
-} from "../controllers/strategy.controller.js";
+  getConversationsController,
+  getMessagesController
+} from "../controllers/conversation.controller.js";
 
 const router =
   express.Router();
 
 /*
-  Get strategies
+  List conversations
 */
 
 router.get(
@@ -21,19 +21,19 @@ router.get(
 
   authMiddleware,
 
-  getStrategiesController
+  getConversationsController
 );
 
 /*
-  Create strategy
+  Conversation messages
 */
 
-router.post(
-  "/",
+router.get(
+  "/:id",
 
   authMiddleware,
 
-  createStrategyController
+  getMessagesController
 );
 
 export default router;
