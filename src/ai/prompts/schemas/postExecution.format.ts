@@ -16,10 +16,14 @@ Return ONLY valid JSON.
       },
 
       "productionGuidance": {
-        "contentFormat": "",
+        "productionObjective": "",
         "narrativeFlow": "",
-        "productionInstructions": "",
-        "creatorNotes": ""
+        "recordingPlan": "",
+        "editingGuidelines": "",
+        "creatorInstructions": "",
+        "assetsRequired": [],
+        "whatWeNeedFromYou": [],
+        "productionChecklist": []
       }
     }
   }

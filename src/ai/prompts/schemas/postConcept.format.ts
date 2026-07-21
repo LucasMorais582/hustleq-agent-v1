@@ -13,17 +13,19 @@ Return ONLY valid JSON.
         "description": "",
         "hook": "",
         "goal": "",
-        "funnelStage": ""
+        "funnelStage": "TOFU | MOFU | BOFU"
       },
 
-      "creativeDirection": {
-        "visualStyle": "",
-        "composition": "",
-        "visualElements": "",
-        "typographyGuidance": "",
-        "emotionalTone": "",
-        "executionDetails": ""
-      },
+    "creativeDirection": {
+      "visualConcept": "",
+      "openingImpact": "",
+      "visualNarrative": "",
+      "visualMood": "",
+      "colorAndTypography": "",
+      "audienceEmotion": "",
+      "platformNativeElements": "",
+      "executionDetails": ""
+    },
 
       "postingReminder": []
     }

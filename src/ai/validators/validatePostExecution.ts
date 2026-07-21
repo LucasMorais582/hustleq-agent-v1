@@ -5,6 +5,7 @@ export function validatePostExecution(
     console.log(
       "Invalid execution: empty object"
     );
+
     return false;
   }
 
@@ -12,10 +13,33 @@ export function validatePostExecution(
     CAPTION
   */
 
-  if (!execution.caption?.body) {
+  if (
+    !execution.caption?.hook
+  ) {
+    console.log(
+      "Invalid execution: missing hook"
+    );
+
+    return false;
+  }
+
+  if (
+    !execution.caption?.body
+  ) {
     console.log(
       "Invalid execution: missing body"
     );
+
+    return false;
+  }
+
+  if (
+    !execution.caption?.cta
+  ) {
+    console.log(
+      "Invalid execution: missing cta"
+    );
+
     return false;
   }
 
@@ -25,6 +49,7 @@ export function validatePostExecution(
     console.log(
       "Invalid execution: missing caption"
     );
+
     return false;
   }
 
@@ -34,22 +59,95 @@ export function validatePostExecution(
 
   if (
     !execution.productionGuidance
-      ?.productionInstructions
+      ?.recordingPlan
   ) {
     console.log(
-      "Invalid execution: missing productionInstructions"
+      "Invalid execution: missing recordingPlan"
     );
+
     return false;
   }
 
   if (
     execution.productionGuidance
-      .productionInstructions
-      .length < 100
+      .recordingPlan.length < 120
   ) {
     console.log(
-      "Invalid execution: productionInstructions too short"
+      "Invalid execution: recordingPlan too short"
     );
+
+    return false;
+  }
+
+  if (
+    !execution.productionGuidance
+      ?.editingGuidelines
+  ) {
+    console.log(
+      "Invalid execution: missing editingGuidelines"
+    );
+
+    return false;
+  }
+
+  if (
+    execution.productionGuidance
+      .editingGuidelines.length < 80
+  ) {
+    console.log(
+      "Invalid execution: editingGuidelines too short"
+    );
+
+    return false;
+  }
+
+  if (
+    !execution.productionGuidance
+      ?.creatorInstructions
+  ) {
+    console.log(
+      "Invalid execution: missing creatorInstructions"
+    );
+
+    return false;
+  }
+
+  if (
+    !Array.isArray(
+      execution.productionGuidance
+        ?.assetsRequired
+    )
+  ) {
+    console.log(
+      "Invalid execution: assetsRequired must be array"
+    );
+
+    return false;
+  }
+
+  if (
+    !Array.isArray(
+      execution.productionGuidance
+        ?.whatWeNeedFromYou
+    )
+  ) {
+    console.log(
+      "Invalid execution: whatWeNeedFromYou must be array"
+    );
+
+    return false;
+  }
+
+  if (
+    !Array.isArray(
+      execution.productionGuidance
+        ?.productionChecklist
+    )
+  ) {
+    console.log(
+      "Invalid execution: productionChecklist must be array"
+    );
+
     return false;
   }
 

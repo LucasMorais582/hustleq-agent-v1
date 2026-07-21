@@ -6,7 +6,9 @@ import {
 
 import {
   createStrategyController,
-  getStrategiesController
+  deleteStrategyController,
+  getStrategiesController,
+  getStrategyController
 } from "../controllers/strategy.controller.js";
 
 const router =
@@ -25,6 +27,18 @@ router.get(
 );
 
 /*
+  Get strategiy
+*/
+
+router.get(
+  "/:id",
+
+  authMiddleware,
+
+  getStrategyController
+);
+
+/*
   Create strategy
 */
 
@@ -36,4 +50,15 @@ router.post(
   createStrategyController
 );
 
+/*
+  Delete strategy
+*/
+
+router.delete(
+  "/:id",
+
+  authMiddleware,
+
+  deleteStrategyController
+);
 export default router;

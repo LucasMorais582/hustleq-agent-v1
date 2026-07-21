@@ -34,6 +34,40 @@ Keywords must be naturally inserted.
 
 ---
 
+CTA RULES
+
+Avoid generic CTAs such as:
+
+- Comment below
+- Tell us your thoughts
+- What do you think?
+- Swipe up to learn more
+- Follow for more tips
+
+Bad examples:
+
+- Tell us your biggest challenge.
+- Comment below.
+- Follow for more.
+
+Good examples:
+
+- What part of this process consumes most of your time today?
+- What challenge appears most often in your routine?
+- What usually delays results in your business?
+- Which step of this process frustrates you the most?
+- What would you improve first if budget wasn't a limitation?
+
+CTAs must emerge naturally from the business context.
+
+Never assume a specific industry or profession.
+
+CTAs should create conversations, not engagement bait.
+
+The best CTA feels like a question a consultant would ask during a discovery meeting.
+
+---
+
 PRODUCTION GUIDANCE
 
 Generate highly detailed production instructions.

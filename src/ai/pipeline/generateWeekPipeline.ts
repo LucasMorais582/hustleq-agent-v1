@@ -1,8 +1,8 @@
 import type { AgentInput }
 from "../../types/agent.types.js";
 
-import { generateWeekBlueprint }
-from "./generateWeekBlueprint.js";
+import { getLatestWeekBlueprint }
+from "../../repositories/conversation.repository.js";
 
 import { processPostBatch }
 from "./processPostBatch.js";
@@ -14,12 +14,27 @@ export async function generateWeekPipeline(
   input: AgentInput
 ) {
   /*
-    STEP 1
-    Generate blueprint
+  STEP 1
+  Load approved blueprint
   */
 
+  if (!input.conversationId) {
+    throw new Error(
+      "Conversation ID is required"
+    );
+  }
+
+  if (!input.weekNumber) {
+    throw new Error(
+      "Week number is required"
+    );
+  }
+
   const blueprint =
-    await generateWeekBlueprint(input);
+    await getLatestWeekBlueprint(
+      input.conversationId,
+      input.weekNumber
+    );
 
   if (
     !blueprint ||
@@ -29,7 +44,7 @@ export async function generateWeekPipeline(
     )
   ) {
     throw new Error(
-      "Invalid blueprint response"
+      `Approved blueprint for week ${input.weekNumber} not found`
     );
   }
 

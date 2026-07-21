@@ -1,4 +1,7 @@
-export const CONTENT_WEEK_BLUEPRINT_FORMAT = `
+
+export function buildWeekBlueprintPromptFormat(week: any) {
+
+return `
 Return ONLY valid JSON.
 
 {
@@ -8,7 +11,7 @@ Return ONLY valid JSON.
     "type": "CONTENT_WEEK_BLUEPRINT",
 
     "data": {
-      "week": 1,
+      "week": ${week},
 
       "blueprint": [
         {
@@ -29,3 +32,5 @@ Return ONLY valid JSON.
   }
 }
 `;
+
+}

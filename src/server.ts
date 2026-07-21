@@ -19,9 +19,9 @@ app.use(express.json());
 
 app.use("/agent", agentRoutes);
 app.use("/auth", authRoutes);
-app.use("/business", businessRoutes);
-app.use("/strategy", strategyRoutes);
-app.use("/conversation", conversationRoutes);
+app.use("/business-context", businessRoutes);
+app.use("/content-strategy", strategyRoutes);
+app.use("/conversations", conversationRoutes);
 
 app.get("/health", (req, res) => {
   res.send("API running...");

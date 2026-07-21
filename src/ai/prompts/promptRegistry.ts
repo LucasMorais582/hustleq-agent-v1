@@ -13,12 +13,13 @@ import { ANALYSIS_FORMAT } from "./schemas/analysis.format.js";
 import { BEST_TIME_FORMAT } from "./schemas/bestTime.format.js";
 import { CONTENT_STRATEGY_FORMAT } from "./schemas/contentStrategy.format.js";
 import { CONTENT_MONTH_STRATEGY_FORMAT } from "./schemas/monthStrategy.format.js";
-import { CONTENT_WEEK_BLUEPRINT_FORMAT } from "./schemas/weekBlueprint.format.js";
+import { buildWeekBlueprintPromptFormat } from "./schemas/weekBlueprint.format.js";
 import { CONTENT_POST_CONCEPT_FORMAT } from "./schemas/postConcept.format.js";
 import { CONTENT_POST_EXECUTION_FORMAT } from "./schemas/postExecution.format.js";
 
 import type { AgentInput }
 from "../../types/agent.types.js";
+import { buildBackupBlueprintPrompt } from "./tasks/backupBlueprint.prompt.js";
 
 export function getModePrompt(
   input?: AgentInput,
@@ -45,7 +46,8 @@ export function getModePrompt(
 
     case "CONTENT_WEEK_BLUEPRINT":
       return buildWeekBlueprintPrompt(
-        input?.planConfig
+        input?.planConfig,
+        input?.mode
       );
 
     case "CONTENT_POST_CONCEPT":
@@ -54,6 +56,11 @@ export function getModePrompt(
     case "CONTENT_POST_EXECUTION":
       return CONTENT_POST_EXECUTION_PROMPT;
 
+    case "CONTENT_BACKUP_BLUEPRINT":
+      return buildBackupBlueprintPrompt(
+        input?.planConfig
+      );
+
     case "CONTENT_PLAN_BACKUP":
     default:
       return "";
@@ -61,7 +68,8 @@ export function getModePrompt(
 }
 
 export function getFormatPrompt(
-  mode?: string
+  mode?: string,
+  weekNumber?: string
 ) {
   switch (mode) {
     case "IDEAS":
@@ -83,13 +91,18 @@ export function getFormatPrompt(
       return CONTENT_MONTH_STRATEGY_FORMAT;
 
     case "CONTENT_WEEK_BLUEPRINT":
-      return CONTENT_WEEK_BLUEPRINT_FORMAT;
+      return buildWeekBlueprintPromptFormat(weekNumber);
 
     case "CONTENT_POST_CONCEPT":
       return CONTENT_POST_CONCEPT_FORMAT;
 
     case "CONTENT_POST_EXECUTION":
       return CONTENT_POST_EXECUTION_FORMAT;
+
+    case "CONTENT_BACKUP_BLUEPRINT":
+      return buildWeekBlueprintPromptFormat(
+        weekNumber
+      );
 
     default:
       return ANALYSIS_FORMAT;

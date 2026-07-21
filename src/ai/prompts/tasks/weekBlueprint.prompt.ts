@@ -1,4 +1,32 @@
-export function buildWeekBlueprintPrompt(planConfig: any) {
+export function buildWeekBlueprintPrompt(planConfig: any, mode?: string) {
+const isBackup = mode === "CONTENT_BACKUP_PIPELINE";
+const backupInstructions = isBackup
+  ? `
+    ---
+    
+    BACKUP CONTENT
+    
+    You are generating backup content for this monthly strategy.
+    
+    These ideas are reserve posts that may replace or complement the regular weekly plan.
+    
+    IMPORTANT:
+    
+    Do NOT repeat concepts.
+    
+    Do NOT repeat hooks.
+    
+    Do NOT repeat communication angles.
+    
+    Do NOT repeat storytelling structures.
+    
+    Do NOT repeat CTAs.
+    
+    Explore different pillars whenever possible.
+    
+    Every idea should feel complementary to the monthly strategy, not like a duplicate of previous weeks.
+  `
+  : "";
 
 return `
     You are a senior social media strategist.
@@ -26,6 +54,10 @@ return `
     Do NOT generate creative direction.
 
     Do NOT generate production guidance.
+
+    ---
+
+    ${backupInstructions}
 
     ---
 

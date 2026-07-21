@@ -11,6 +11,10 @@ import type {
   BusinessContextInput
 } from "../types/agent.types.js";
 
+import {
+  getLatestMonthStrategy
+} from "../repositories/conversation.repository.js";
+
 export async function processAgentChat(
   userId: string,
   body: any
@@ -55,31 +59,7 @@ export async function processAgentChat(
         )
       : fallbackContext;
 
-  /*
-    Strategy
-  */
-
-  const strategyModes = [
-    "CONTENT_PLAN_WEEK_V3"
-  ];
-
-  if (
-    strategyModes.includes(mode)
-    && strategyId
-  ) {
-    strategy =
-      await prisma.contentStrategy.findUnique({
-        where: { id: strategyId },
-      });
-
-    if (!strategy) {
-      throw new Error(
-        "Strategy not found"
-      );
-    }
-  }
-
-  /*
+    /*
     Conversation
   */
 
@@ -105,6 +85,52 @@ export async function processAgentChat(
     if (!conversation) {
       throw new Error(
         "Conversation not found"
+      );
+    }
+  }
+
+  /*
+    Strategy
+  */
+
+  const strategyModes = [
+    "CONTENT_WEEK_BLUEPRINT",
+    "CONTENT_WEEK_PIPELINE",
+    "CONTENT_BACKUP_PIPELINE",
+  ];
+
+  let resolvedStrategyId = strategyId;
+  let resolvedPlanConfig = planConfig;
+
+  if (
+    strategyModes.includes(mode)
+  ) {
+    if (!resolvedStrategyId) {
+      const latestStrategy = await getLatestMonthStrategy(conversation.id);
+
+      if (!latestStrategy) {
+        throw new Error(
+          "Month strategy not found"
+        );
+      }
+
+      resolvedStrategyId =
+        latestStrategy.metadata?.strategyId;
+
+      resolvedPlanConfig =
+        latestStrategy.metadata?.planConfig;
+    }
+
+    strategy =
+      await prisma.contentStrategy.findUnique({
+        where: {
+          id: resolvedStrategyId,
+        },
+      });
+
+    if (!strategy) {
+      throw new Error(
+        "Strategy not found"
       );
     }
   }
@@ -157,22 +183,41 @@ export async function processAgentChat(
     Execute agent
   */
 
-  const response =
-    await runAgent({
+  let payload: any = {
       userMessage: message,
       history,
       mode,
       contentGoals,
       businessContext:
-        dbContext,
+      dbContext,
       strategy,
-      planConfig,
+      planConfig: resolvedPlanConfig,
       weekNumber,
       monthlyOverview,
       previousWeek,
       userFeedback,
       generatedWeeks,
-    });
+    };
+  if(conversationId) payload.conversationId = conversationId;
+  
+  const response = await runAgent(payload);
+
+  /*
+    Inject metadata into assistant responses
+  */
+
+  for (const msg of response) {
+    if (msg.content?.type === "CONTENT_MONTH_STRATEGY") {
+      msg.content = {
+        ...msg.content,
+        metadata: {
+            strategyId: resolvedStrategyId,
+            planConfig: resolvedPlanConfig,
+        }
+      };
+    }
+  }
+
 
   /*
     Save response
@@ -181,13 +226,9 @@ export async function processAgentChat(
   for (const msg of response) {
     await prisma.message.create({
       data: {
-        conversationId:
-          conversation.id,
-
+        conversationId: conversation.id,
         role: "assistant",
-
-        content:
-          JSON.stringify(
+        content: JSON.stringify(
             msg.content
           ),
       },
@@ -196,8 +237,6 @@ export async function processAgentChat(
 
   return {
     messages: response,
-
-    conversationId:
-      conversation.id,
+    conversationId: conversation.id,
   };
 }

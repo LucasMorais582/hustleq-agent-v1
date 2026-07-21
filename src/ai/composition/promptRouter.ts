@@ -18,6 +18,7 @@ export function promptRouter(
 ) {
   switch (input.mode) {
     case "CONTENT_WEEK_BLUEPRINT":
+    case "CONTENT_BACKUP_PIPELINE":
       return buildBlueprintPrompt(input);
 
     case "CONTENT_POST_CONCEPT":

@@ -31,7 +31,8 @@ export function buildBlueprintPrompt(
 
   const formatPrompt =
     getFormatPrompt(
-      "CONTENT_WEEK_BLUEPRINT"
+      "CONTENT_WEEK_BLUEPRINT",
+      input.weekNumber
     );
 
   return promptComposer({

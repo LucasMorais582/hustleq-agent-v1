@@ -77,6 +77,8 @@ export type AgentInput = {
     "CONTENT_SINGLE_POST" |
     "CONTENT_POST_CONCEPT" | 
     "CONTENT_POST_EXECUTION"|
+    "CONTENT_BACKUP_PIPELINE" |
+    "CONTENT_BACKUP_BLUEPRINT" |
     undefined;
   history?: HistoryMessage[];
   strategy?: any;
@@ -93,6 +95,7 @@ export type AgentInput = {
   generatedWeeks?: any[];
   monthlyStrategy?: any; 
   blueprintItem?: any;
+  conversationId?: string;
 };
 
 export type PromptComposerInput = {

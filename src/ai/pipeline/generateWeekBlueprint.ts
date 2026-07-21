@@ -20,8 +20,11 @@ export async function generateWeekBlueprint(
 
       const blueprintInput: any = {
         ...input,
-        mode: "CONTENT_WEEK_BLUEPRINT",
-      };
+        mode:
+        input.mode === "CONTENT_BACKUP_BLUEPRINT"
+          ? "CONTENT_BACKUP_BLUEPRINT"
+          : "CONTENT_WEEK_BLUEPRINT",
+          };
 
       /*
         Build prompt
@@ -49,8 +52,7 @@ export async function generateWeekBlueprint(
       const response =
         await executeAgent({
           messages,
-          mode:
-            "CONTENT_WEEK_BLUEPRINT",
+          mode: blueprintInput.mode,
           model: "gpt-4o",
         });
 
@@ -62,7 +64,11 @@ export async function generateWeekBlueprint(
         response.find(
           (msg: any) =>
             msg.content?.type ===
-            "CONTENT_WEEK_BLUEPRINT"
+            (
+              blueprintInput.mode === "CONTENT_BACKUP_PIPELINE"
+                ? "CONTENT_BACKUP_PIPELINE"
+                : "CONTENT_WEEK_BLUEPRINT"
+            )
         );
 
       return blueprintMessage
