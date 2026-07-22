@@ -15,15 +15,12 @@ export async function executeAgent({
   mode = "TEXT",
 }: ExecuteAgentInput) {
 
-  const temperature =
-    temperatureRouter(mode);
-
-  const parsed =
-    await generateCompletion({
-      messages,
-      temperature,
-      model,
-    });
+  const temperature = temperatureRouter(mode);
+  const parsed = await generateCompletion({
+    messages,
+    temperature,
+    model,
+  });
 
   return formatAgentResponse(
     parsed,

@@ -1,21 +1,11 @@
-import type { AgentInput }
-from "../../types/agent.types.js";
+import type { AgentInput } from "../../types/agent.types.js";
+import { buildDefaultPrompt } from "./buildDefaultPrompt.js";
+import { buildBlueprintPrompt } from "./buildBlueprintPrompt.js";
+import { buildPostConceptPrompt } from "./buildPostConceptPrompt.js";
+import { buildPostExecutionPrompt } from "./buildPostExecutionPrompt.js";
+import { buildWeekExecutionRequirementsPrompt } from "./buildWeekExecutionRequirementsPrompt.js";
 
-import { buildDefaultPrompt }
-from "./buildDefaultPrompt.js";
-
-import { buildBlueprintPrompt }
-from "./buildBlueprintPrompt.js";
-
-import { buildPostConceptPrompt }
-from "./buildPostConceptPrompt.js";
-
-import { buildPostExecutionPrompt }
-from "./buildPostExecutionPrompt.js";
-
-export function promptRouter(
-  input: AgentInput
-) {
+export function promptRouter(input: AgentInput) {
   switch (input.mode) {
     case "CONTENT_WEEK_BLUEPRINT":
     case "CONTENT_BACKUP_PIPELINE":
@@ -26,6 +16,9 @@ export function promptRouter(
 
     case "CONTENT_POST_EXECUTION":
       return buildPostExecutionPrompt(input);
+
+    case "WEEK_EXECUTION_REQUIREMENTS":
+      return buildWeekExecutionRequirementsPrompt(input);
 
     default:
       return buildDefaultPrompt(input);

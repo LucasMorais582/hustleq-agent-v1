@@ -128,19 +128,6 @@ export function validatePostExecution(
   if (
     !Array.isArray(
       execution.productionGuidance
-        ?.whatWeNeedFromYou
-    )
-  ) {
-    console.log(
-      "Invalid execution: whatWeNeedFromYou must be array"
-    );
-
-    return false;
-  }
-
-  if (
-    !Array.isArray(
-      execution.productionGuidance
         ?.productionChecklist
     )
   ) {

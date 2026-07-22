@@ -1,11 +1,7 @@
-export function formatAgentResponse(
-  parsed: any,
-  mode: string
-) {
+export function formatAgentResponse(parsed: any, mode: string) {
   if (parsed?.ideas) {
     parsed = {
-      text:
-        "Here are some ideas based on your request.",
+      text: "Here are some ideas based on your request.",
       data: {
         type: mode,
         data: parsed,

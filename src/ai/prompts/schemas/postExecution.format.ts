@@ -22,7 +22,6 @@ Return ONLY valid JSON.
         "editingGuidelines": "",
         "creatorInstructions": "",
         "assetsRequired": [],
-        "whatWeNeedFromYou": [],
         "productionChecklist": []
       }
     }

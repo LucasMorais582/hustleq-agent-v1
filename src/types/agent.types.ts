@@ -79,6 +79,7 @@ export type AgentInput = {
     "CONTENT_POST_EXECUTION"|
     "CONTENT_BACKUP_PIPELINE" |
     "CONTENT_BACKUP_BLUEPRINT" |
+    "WEEK_EXECUTION_REQUIREMENTS" |
     undefined;
   history?: HistoryMessage[];
   strategy?: any;

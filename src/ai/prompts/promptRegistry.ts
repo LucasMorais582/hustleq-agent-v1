@@ -6,6 +6,7 @@ import { CONTENT_MONTH_STRATEGY_PROMPT } from "./tasks/monthStrategy.prompt.js";
 import { buildWeekBlueprintPrompt } from "./tasks/weekBlueprint.prompt.js";
 import { CONTENT_POST_CONCEPT_PROMPT } from "./tasks/postConcept.prompt.js";
 import { CONTENT_POST_EXECUTION_PROMPT } from "./tasks/postExecution.prompt.js";
+import { WEEK_EXECUTION_REQUIREMENTS_PROMPT } from "./tasks/weekExecutionRequirements.prompt.js";
 
 import { IDEAS_FORMAT } from "./schemas/ideas.format.js";
 import { CAPTION_FORMAT } from "./schemas/caption.format.js";
@@ -16,17 +17,13 @@ import { CONTENT_MONTH_STRATEGY_FORMAT } from "./schemas/monthStrategy.format.js
 import { buildWeekBlueprintPromptFormat } from "./schemas/weekBlueprint.format.js";
 import { CONTENT_POST_CONCEPT_FORMAT } from "./schemas/postConcept.format.js";
 import { CONTENT_POST_EXECUTION_FORMAT } from "./schemas/postExecution.format.js";
+import { WEEK_EXECUTION_REQUIREMENTS_FORMAT } from "./schemas/weekExecutionRequirements.format.js";
 
-import type { AgentInput }
-from "../../types/agent.types.js";
+import type { AgentInput } from "../../types/agent.types.js";
 import { buildBackupBlueprintPrompt } from "./tasks/backupBlueprint.prompt.js";
 
-export function getModePrompt(
-  input?: AgentInput,
-  mode?: string
-) {
-  const contentMode =
-    mode ? mode : input?.mode;
+export function getModePrompt(input?: AgentInput, mode?: string) {
+  const contentMode = mode ? mode : input?.mode;
 
   switch (contentMode) {
     case "IDEAS":
@@ -60,6 +57,9 @@ export function getModePrompt(
       return buildBackupBlueprintPrompt(
         input?.planConfig
       );
+    
+    case "WEEK_EXECUTION_REQUIREMENTS":
+      return WEEK_EXECUTION_REQUIREMENTS_PROMPT;
 
     case "CONTENT_PLAN_BACKUP":
     default:
@@ -103,6 +103,9 @@ export function getFormatPrompt(
       return buildWeekBlueprintPromptFormat(
         weekNumber
       );
+    
+    case "WEEK_EXECUTION_REQUIREMENTS":
+      return WEEK_EXECUTION_REQUIREMENTS_FORMAT;
 
     default:
       return ANALYSIS_FORMAT;

@@ -6,29 +6,20 @@ import { buildAgentMessages } from "../composition/buildAgentMessages.js";
 import { executeAgent } from "../core/executeAgent.js";
 
 export async function runAgent(input: AgentInput | any) {
-  if (input.mode === "CONTENT_WEEK_PIPELINE") {
-    const week: any = await generateWeekPipeline(input);
-
+  if (input.mode === "CONTENT_WEEK_PIPELINE" || input.mode === "CONTENT_BACKUP_PIPELINE") {
+    
+    let week: any = null;
+    
+    input.mode === "CONTENT_WEEK_PIPELINE" ? 
+    week = await generateWeekPipeline(input) : 
+    week = await generateBackupPipeline(input);
+    
     return [
       {
         role: "assistant",
         content: {
-          type: "CONTENT_WEEK_PIPELINE",
+          type: input.mode,
           data: week,
-        },
-      },
-    ];
-  }
-
-  if (input.mode === "CONTENT_BACKUP_PIPELINE") {
-    const backup = await generateBackupPipeline(input);
-
-    return [
-      {
-        role: "assistant",
-        content: {
-          type: "CONTENT_BACKUP_PIPELINE",
-          data: backup,
         },
       },
     ];

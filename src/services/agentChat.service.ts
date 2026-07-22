@@ -1,24 +1,10 @@
 import { prisma } from "../lib/prisma.js";
+import { runAgent } from "../ai/orchestrator/dukeOrchestrator.js";
+import { mapContextToAgent } from "./businessContext.service.js";
+import type { BusinessContextInput } from "../types/agent.types.js";
+import { getLatestMonthStrategy } from "../repositories/conversation.repository.js";
 
-import { runAgent }
-from "../ai/orchestrator/dukeOrchestrator.js";
-
-import {
-  mapContextToAgent
-} from "./businessContext.service.js";
-
-import type {
-  BusinessContextInput
-} from "../types/agent.types.js";
-
-import {
-  getLatestMonthStrategy
-} from "../repositories/conversation.repository.js";
-
-export async function processAgentChat(
-  userId: string,
-  body: any
-) {
+export async function processAgentChat(userId: string, body: any) {
   const {
     message,
     conversationId,
@@ -40,10 +26,9 @@ export async function processAgentChat(
     Business context
   */
 
-  const contextFromDB =
-    await prisma.businessContext.findUnique({
+  const contextFromDB = await prisma.businessContext.findUnique({
       where: { userId },
-    });
+  });
 
   const fallbackContext:
     BusinessContextInput = {
@@ -52,12 +37,7 @@ export async function processAgentChat(
       primaryGoals: ["ENGAGEMENT"],
     };
 
-  const dbContext =
-    contextFromDB
-      ? mapContextToAgent(
-          contextFromDB
-        )
-      : fallbackContext;
+  const dbContext = contextFromDB ? mapContextToAgent(contextFromDB) : fallbackContext;
 
     /*
     Conversation
@@ -102,9 +82,7 @@ export async function processAgentChat(
   let resolvedStrategyId = strategyId;
   let resolvedPlanConfig = planConfig;
 
-  if (
-    strategyModes.includes(mode)
-  ) {
+  if (strategyModes.includes(mode)) {
     if (!resolvedStrategyId) {
       const latestStrategy = await getLatestMonthStrategy(conversation.id);
 
@@ -114,15 +92,11 @@ export async function processAgentChat(
         );
       }
 
-      resolvedStrategyId =
-        latestStrategy.metadata?.strategyId;
-
-      resolvedPlanConfig =
-        latestStrategy.metadata?.planConfig;
+      resolvedStrategyId = latestStrategy.metadata?.strategyId;
+      resolvedPlanConfig = latestStrategy.metadata?.planConfig;
     }
 
-    strategy =
-      await prisma.contentStrategy.findUnique({
+    strategy = await prisma.contentStrategy.findUnique({
         where: {
           id: resolvedStrategyId,
         },
@@ -139,20 +113,17 @@ export async function processAgentChat(
     History
   */
 
-  const messages =
-    await prisma.message.findMany({
+  const messages = await prisma.message.findMany({
       where: {
         conversationId:
           conversation.id
       },
-
       orderBy: {
         createdAt: "asc"
       },
     });
 
-  const history =
-    messages.map((msg) => ({
+  const history = messages.map((msg) => ({
       role:
         (
           msg.role === "assistant"
@@ -170,11 +141,8 @@ export async function processAgentChat(
 
   await prisma.message.create({
     data: {
-      conversationId:
-        conversation.id,
-
+      conversationId: conversation.id,
       role: "user",
-
       content: message,
     },
   });
@@ -218,7 +186,6 @@ export async function processAgentChat(
     }
   }
 
-
   /*
     Save response
   */
@@ -228,9 +195,7 @@ export async function processAgentChat(
       data: {
         conversationId: conversation.id,
         role: "assistant",
-        content: JSON.stringify(
-            msg.content
-          ),
+        content: JSON.stringify(msg.content),
       },
     });
   }

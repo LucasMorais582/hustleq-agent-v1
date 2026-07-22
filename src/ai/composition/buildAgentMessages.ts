@@ -31,19 +31,15 @@ export function buildAgentMessages(
       })
     );
 
-  const lastOutput =
-    extractLastOutput(
-      input.history || []
-    );
-
-  const ignoreHistory =
-    shouldIgnoreHistory(input);
+  const lastOutput = extractLastOutput(input.history || []);
+  const ignoreHistory = shouldIgnoreHistory(input);
 
   const internalModes = [
     "CONTENT_WEEK_BLUEPRINT",
     "CONTENT_SINGLE_POST",
     "CONTENT_POST_CONCEPT",
-    "CONTENT_POST_EXECUTION"
+    "CONTENT_POST_EXECUTION",
+    "WEEK_EXECUTION_REQUIREMENTS"
   ];
 
   /*

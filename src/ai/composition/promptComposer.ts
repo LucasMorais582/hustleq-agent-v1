@@ -1,8 +1,6 @@
 import type { PromptComposerInput } from "../../types/agent.types.js";
 
-export function promptComposer({
-  sections,
-}: PromptComposerInput) {
+export function promptComposer({ sections }: PromptComposerInput) {
   return `
     ${sections
       .filter(Boolean)
