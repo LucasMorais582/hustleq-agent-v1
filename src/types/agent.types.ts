@@ -62,7 +62,25 @@ export type AgentInput = {
   contentGoals?: ("ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING")[];
   contentGoal?: "ENGAGEMENT" | "CONVERSION" | "EDUCATIONAL" | "BRAND" | "STORYTELLING";
   businessContext: BusinessContextInput;
-  mode?: "IDEAS" | "ANALYSIS" | "CAPTION" | "BEST_TIME" | "PERSONA" | "MARKET_INSIGHTS" | "CONTENT_STRATEGY" | "CONTENT_PLAN_WEEK" | "CONTENT_PLAN_MODIFICATION" | "CONTENT_PLAN_OVERVIEW" | undefined;
+  mode?: 
+    "IDEAS" |
+    "ANALYSIS" |
+    "CAPTION" |
+    "BEST_TIME" |
+    "PERSONA" |
+    "MARKET_INSIGHTS" |
+    "CONTENT_STRATEGY" |
+    "CONTENT_PLAN_WEEK" |
+    "CONTENT_PLAN_MODIFICATION" |
+    "CONTENT_PLAN_OVERVIEW" |
+    "CONTENT_WEEK_BLUEPRINT" |
+    "CONTENT_SINGLE_POST" |
+    "CONTENT_POST_CONCEPT" | 
+    "CONTENT_POST_EXECUTION"|
+    "CONTENT_BACKUP_PIPELINE" |
+    "CONTENT_BACKUP_BLUEPRINT" |
+    "WEEK_EXECUTION_REQUIREMENTS" |
+    undefined;
   history?: HistoryMessage[];
   strategy?: any;
   planConfig?: {
@@ -76,4 +94,11 @@ export type AgentInput = {
   previousWeek?: any;
   userFeedback?: string;
   generatedWeeks?: any[];
+  monthlyStrategy?: any; 
+  blueprintItem?: any;
+  conversationId?: string;
+};
+
+export type PromptComposerInput = {
+  sections: string[];
 };
