@@ -1,5 +1,4 @@
-import { processAgentChat }
-from "../services/agentChat.service.js";
+import { processAgentChat } from "../services/agentChat.service.js";
 
 export async function agentChatController(
   req: any,
