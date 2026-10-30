@@ -79,6 +79,9 @@ Rules:
 - The caption is 2 to 4 short sentences, sounds like the owner, mentions the offer,
   and ends with one clear next step. If next month matters, weave it in naturally.
 - Plain English, no hashtags inside the caption, at most 2 emojis.
+- "format" names the length and the style of THIS idea, capitalized, and must match what to film.
+  Shape: "<length> <Reel|Carousel|Photo>, <style>", e.g. "20 second Reel, real kitchen sound"
+  or "Carousel, 5 slides". Never a single word.
 - "time" is a suggested day and time to post, like "Tuesday, 7:30 PM".
 - Never invent facts about the business (prices, addresses, awards, phone, email, website).
   For the next step use "link in bio" or "DM us", unless their captions show another channel.
