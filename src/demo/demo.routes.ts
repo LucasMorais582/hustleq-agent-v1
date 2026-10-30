@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import {
   demoIdeaController,
   demoProfileController,
+  demoProfileImageController,
   getNichesController
 } from "./demo.controller.js";
 
@@ -54,6 +55,15 @@ router.post(
   limiter(Number(process.env.DEMO_PROFILE_LIMIT_PER_15MIN || 60)),
 
   demoProfileController
+);
+
+// Served to <img>, so CORS doesn't apply; it only reads profiles already looked up.
+router.get(
+  "/profile-image/:handle",
+
+  limiter(Number(process.env.DEMO_IMAGE_LIMIT_PER_15MIN || 300)),
+
+  demoProfileImageController
 );
 
 router.post(
