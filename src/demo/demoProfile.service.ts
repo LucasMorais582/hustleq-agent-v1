@@ -195,3 +195,30 @@ export async function getDemoProfile(rawHandle: string) {
 
   return { profile, insight };
 }
+
+/*
+  Profile photo for the demo card. Instagram's CDN answers with
+  Cross-Origin-Resource-Policy: same-origin, so the browser can't show the URL on our site.
+  We serve it from here, only for handles already in the cache and only from Instagram hosts.
+*/
+const IMAGE_HOSTS = /^https:\/\/[a-z0-9.-]+\.(cdninstagram\.com|fbcdn\.net)\//i;
+const imageMemo = new Map<string, { body: Buffer; type: string }>();
+
+export async function getDemoProfileImage(rawHandle: string) {
+  const handle = normalizeHandle(rawHandle);
+  const memo = imageMemo.get(handle);
+  if (memo) return memo;
+
+  const cached = await prisma.demoProfileCache.findUnique({ where: { handle } });
+  const url = (cached?.profile as DemoProfile | undefined)?.image_url;
+  if (!url || !IMAGE_HOSTS.test(url)) return null;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+  const type = res?.headers.get("content-type") || "";
+  if (!res?.ok || !type.startsWith("image/")) return null;
+
+  const image = { body: Buffer.from(await res.arrayBuffer()), type };
+  if (imageMemo.size >= 300) imageMemo.delete(imageMemo.keys().next().value!);
+  imageMemo.set(handle, image);
+  return image;
+}

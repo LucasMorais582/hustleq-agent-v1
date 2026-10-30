@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { DemoCapacityError, getDemoProfile } from "./demoProfile.service.js";
+import { DemoCapacityError, getDemoProfile, getDemoProfileImage } from "./demoProfile.service.js";
 import { DemoInputError, generateDemoIdea, parseAnswers } from "./demoIdea.service.js";
 import { SocialDataError } from "./socialData.client.js";
 
@@ -47,6 +47,30 @@ export async function demoProfileController(req: any, res: any) {
 
     console.error("[demo] profile failed:", error.message);
     return res.status(502).json({ ok: false, error: "Profile lookup failed" });
+  }
+}
+
+export async function demoProfileImageController(req: any, res: any) {
+  const handle = String(req.params?.handle || "");
+
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(handle)) {
+    return res.status(400).end();
+  }
+
+  try {
+    const image = await getDemoProfileImage(handle);
+    if (!image) return res.status(404).end();
+
+    res.set({
+      "Content-Type": image.type,
+      "Cache-Control": "public, max-age=86400",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+    });
+    return res.send(image.body);
+
+  } catch (error: any) {
+    console.error("[demo] profile image failed:", error.message);
+    return res.status(404).end();
   }
 }
 
