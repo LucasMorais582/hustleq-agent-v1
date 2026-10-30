@@ -1,7 +1,10 @@
 /*
   Client for hustleq-social-data-api (Apify behind it).
-  Every call is slow (profile ~17s, trends ~55s), so callers set their own timeout.
+  Every call is slow (profile ~17s, trends 2-4 min), so callers set their own timeout.
+  Auth: a short-lived HS256 JWT signed with the secret the API shares (JWT_SECRET there).
 */
+
+import { createHmac } from "node:crypto";
 
 export class SocialDataError extends Error {
   constructor(
@@ -38,11 +41,12 @@ type ProfileResponse = {
 
 type TrendsResponse = {
   response: {
-    target: string;
+    keywords: string[];
     collectedAt: string;
     daysBack: number;
     posts: {
       id: string;
+      keyword?: string | null;
       url?: string | null;
       caption?: string | null;
       hashtags?: string[] | null;
@@ -59,6 +63,22 @@ type TrendsResponse = {
   };
 };
 
+const b64url = (input: string | Buffer) => Buffer.from(input).toString("base64url");
+
+function signToken(secret: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = b64url(JSON.stringify({
+    sub: "marketing-agent",
+    iss: process.env.SOCIAL_DATA_JWT_ISSUER || "hustleq",
+    aud: process.env.SOCIAL_DATA_JWT_AUDIENCE || "hustleq-social-data-api",
+    iat: now,
+    exp: now + 600,
+  }));
+  const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
+  return `${header}.${payload}.${signature}`;
+}
+
 async function post<T>(path: string, body: unknown, timeoutMs: number): Promise<T> {
   const base = process.env.SOCIAL_DATA_API_URL;
 
@@ -67,7 +87,8 @@ async function post<T>(path: string, body: unknown, timeoutMs: number): Promise<
   }
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (process.env.SOCIAL_DATA_API_KEY) headers["x-api-key"] = process.env.SOCIAL_DATA_API_KEY;
+  const secret = process.env.SOCIAL_DATA_JWT_SECRET;
+  if (secret) headers.Authorization = `Bearer ${signToken(secret)}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -108,13 +129,14 @@ export async function fetchInstagramProfile(username: string, timeoutMs = 40000)
   return data.response;
 }
 
+// All keywords go in one Apify run; searchLimit is per keyword.
 export async function fetchInstagramTrends(
-  target: string,
+  keywords: string[],
   { daysBack = 14, searchLimit = 15, timeoutMs = 300000 } = {}
 ) {
   const data = await post<TrendsResponse>(
     "/api/v1/instagram/trends/search",
-    { target, daysBack, searchLimit },
+    { keywords, daysBack, searchLimit },
     timeoutMs
   );
 
