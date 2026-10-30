@@ -43,17 +43,15 @@ function isValidSummary(s: any) {
 export async function refreshNicheTrends(niche: { key: string; label: string; keywords: string[] }) {
   const seen = new Map<string, NormalizedPost>();
 
-  // One keyword at a time: each Apify run already takes close to a minute.
-  for (const keyword of niche.keywords) {
-    try {
-      const res = await fetchInstagramTrends(keyword);
-      for (const raw of res.posts || []) {
-        const post = normalizeTrendPost(raw);
-        if (post.caption) seen.set(post.id, post);
-      }
-    } catch (error: any) {
-      console.error(`[demo] trends "${keyword}" failed:`, error.message);
+  // One Apify run for all the niche's keywords (2 to 4 minutes).
+  try {
+    const res = await fetchInstagramTrends(niche.keywords);
+    for (const raw of res.posts || []) {
+      const post = normalizeTrendPost(raw);
+      if (post.caption) seen.set(post.id, post);
     }
+  } catch (error: any) {
+    console.error(`[demo] trends ${niche.key} failed:`, error.message);
   }
 
   const posts = [...seen.values()].sort((a, b) => score(b) - score(a)).slice(0, MAX_POSTS);

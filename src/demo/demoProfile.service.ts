@@ -157,8 +157,9 @@ export async function getDemoProfile(rawHandle: string) {
   try {
     data = await fetchInstagramProfile(handle);
   } catch (error) {
-    // 4xx means the account doesn't exist or is private: the page asks for the handle again.
-    if (error instanceof SocialDataError && error.status && error.status < 500) return null;
+    // 404 means the account doesn't exist or is private: the page asks for the handle again.
+    // Anything else (401 auth, 429 Apify limit, 503) is our failure, never "not found".
+    if (error instanceof SocialDataError && error.status === 404) return null;
     throw error;
   }
 

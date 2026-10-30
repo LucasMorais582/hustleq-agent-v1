@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { DemoCapacityError, getDemoProfile } from "./demoProfile.service.js";
 import { DemoInputError, generateDemoIdea, parseAnswers } from "./demoIdea.service.js";
+import { SocialDataError } from "./socialData.client.js";
 
 /*
   Public endpoints for the Meet Duke page on the landing.
@@ -40,7 +41,7 @@ export async function demoProfileController(req: any, res: any) {
     return res.json({ ok: true, ...result });
 
   } catch (error: any) {
-    if (error instanceof DemoCapacityError) {
+    if (error instanceof DemoCapacityError || (error instanceof SocialDataError && error.status === 429)) {
       return res.status(503).json({ ok: false, error: "Demo is busy, try again later" });
     }
 
