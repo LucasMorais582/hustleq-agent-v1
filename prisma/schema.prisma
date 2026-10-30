@@ -120,3 +120,51 @@ model Integration {
   userId String
   user   User @relation(fields: [userId], references: [id])
 }
+
+// 🎪 MEET DUKE DEMO (public landing demo, isolated from the Beta)
+
+model DemoNiche {
+  key       String   @id
+  label     String
+  keywords  String[] // search terms sent to the trends scraper
+  position  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trendSnapshots DemoTrendSnapshot[]
+}
+
+model DemoTrendSnapshot {
+  id          String   @id @default(uuid())
+  nicheKey    String
+  niche       DemoNiche @relation(fields: [nicheKey], references: [key])
+
+  posts       Json     // normalized posts from the scraper
+  summary     Json     // trend written by the model, read by /demo/idea
+  collectedAt DateTime @default(now())
+
+  @@index([nicheKey, collectedAt])
+}
+
+model DemoProfileCache {
+  handle    String   @id
+  profile   Json
+  posts     Json
+  insight   String?
+  fetchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DemoRun {
+  id         String   @id @default(uuid())
+  handle     String
+  nicheKey   String
+  answers    Json
+  idea       Json?
+  durationMs Int?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
