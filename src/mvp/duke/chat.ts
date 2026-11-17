@@ -30,7 +30,11 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
   const tz = user.timezone;
   const today = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
   // What planning needs, given up front so Duke can draft a week in one step.
-  const [strategy, bundle] = await Promise.all([activeStrategy(userId, tz), user.instagramHandle ? cachedInstagram(user.instagramHandle) : null]);
+  const [strategy, bundle, weeks] = await Promise.all([
+    activeStrategy(userId, tz),
+    user.instagramHandle ? cachedInstagram(user.instagramHandle) : null,
+    db.week.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 3, select: { id: true, startsOn: true, status: true } }),
+  ]);
   const best = bestTime(bundle?.posts ?? [], tz);
   const lines = [
     `Today is ${today} (${tz}). This week starts ${weekStartFor("this", tz)}, next week starts ${weekStartFor("next", tz)} (Mondays).`,
@@ -39,8 +43,11 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
     strategy
       ? `Active strategy: "${strategy.name}" (id ${strategy.id}), week ${strategy.weekNumber} of ${strategy.durationWeeks}. Each week: ${strategy.staticPerWeek} static (feed or carousel), ${strategy.videosPerWeek} videos (reel), ${strategy.storiesPerWeek} stories. Pillars: ${strategy.pillars.map((p) => `${p.name} (${p.description ?? ""})`).join("; ")}.`
       : "No active strategy.",
+    weeks.length
+      ? `Latest weeks: ${weeks.map((w) => `week starting ${w.startsOn.toISOString().slice(0, 10)} (id ${w.id}, ${w.status === "saved" ? "saved" : "draft, not saved"})`).join("; ")}.`
+      : "No weeks planned yet.",
     // Remove lines from here as the features ship.
-    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies and plan weeks (draft, refine, save). Shot lists, export, campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
+    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). Campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
   ];
   return lines.join("\n");
 }
@@ -53,6 +60,8 @@ const STATUS: Record<string, string> = {
   get_planning_context: "Checking your week…",
   draft_week: "Planning your week…",
   revise_week_post: "Changing the post…",
+  build_shot_list: "Listing what to film…",
+  open_export: "Opening export…",
 };
 
 // Earlier turns go back without thinking blocks: the system context can change between turns

@@ -1,4 +1,4 @@
-import { db } from "../db.js";
+import { db, table } from "../db.js";
 import { FIELD_KEYS, PROFILE_FIELDS, profileValues } from "../business/fields.js";
 import { cachedInstagram, FORMAT_LABEL, formatStats, syncInstagram } from "../instagram/own.js";
 import { appUrl, sendEmail } from "../email/send.js";
@@ -42,7 +42,7 @@ type Data = {
 
 async function patchData(userId: string, patch: Data) {
   // jsonb merge in one statement, so the background job and a request don't overwrite each other.
-  await db.$executeRaw`UPDATE "OnboardingState" SET "data" = COALESCE("data", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb, "updatedAt" = now() WHERE "userId" = ${userId}`;
+  await db.$executeRaw`UPDATE ${table("OnboardingState")} SET "data" = COALESCE("data", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb, "updatedAt" = now() WHERE "userId" = ${userId}`;
 }
 
 async function load(userId: string) {

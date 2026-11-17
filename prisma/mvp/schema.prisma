@@ -407,7 +407,16 @@ model ShotList {
   id        String   @id @default(uuid())
   userId    String
   weekId    String   @unique
+  status    String   @default("pending") // pending | ready | failed
+  title     String?  // "Film everything in one session"
+  summary   String?
+  importantNote String?
+  sessions  Int      @default(1)
+  people    String[]
+  locations String[]
+  assets    String[]
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   week  Week           @relation(fields: [weekId], references: [id], onDelete: Cascade)
@@ -419,6 +428,7 @@ model ShotListItem {
   shotListId String
   postId     String?
   text       String
+  stage      String  @default("filming") // before | filming | after
   done       Boolean @default(false)
   position   Int     @default(0)
 
@@ -434,6 +444,7 @@ model Export {
   include   Json?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

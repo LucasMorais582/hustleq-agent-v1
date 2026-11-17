@@ -41,6 +41,11 @@ const user = await db.user.upsert({
 });
 const profile = { businessName: "Bahia Taste", whatYouDo: "Bahian food for events and weekly meal delivery", niche: "Brazilian food", location: "New York and New Jersey", offers: "Event catering, weekly meal prep", doNotPost: "Prices", completedAt: new Date() };
 await db.businessProfile.upsert({ where: { userId: user.id }, update: profile, create: { userId: user.id, ...profile } });
+// Each run starts clean: no strategies, weeks or conversations left from earlier runs.
+await db.post.deleteMany({ where: { userId: user.id } });
+await db.week.deleteMany({ where: { userId: user.id } });
+await db.strategy.deleteMany({ where: { userId: user.id } });
+await db.conversation.deleteMany({ where: { userId: user.id } });
 const cached = { ...BAHIA_TASTE, profile: { ...BAHIA_TASTE.profile, handle } };
 await db.instagramCache.upsert({
   where: { handle },
@@ -117,6 +122,21 @@ if (stratCard) {
     const w2 = await collect(`Make the "${before?.title}" post a Reel.`);
     const after = before ? await db.post.findUniqueOrThrow({ where: { id: before.id } }) : null;
     check("week: refine changes that post to a Reel", after?.format === "reel", `${w2.out.slice(0, 200)}`);
+
+    // ---------- Phase 3b: what to film and export ----------
+    const { saveWeek } = await import("../../src/mvp/plan/service.js");
+    const { writePostDetails } = await import("../../src/mvp/plan/details.js");
+    for (const p of await db.post.findMany({ where: { weekId: wk.id, detailsStatus: { not: "ready" } } })) await writePostDetails(p.id);
+    await saveWeek(user.id, "America/New_York", wk.id, { posts: [], reminders: true });
+    const f1 = await collect("Shot list for the week");
+    check("shot list: opens the what-to-film card", f1.cards.some((c) => c.type === "shot_list" && c.weekId === wk.id), JSON.stringify(f1.cards));
+    const sl = await db.shotList.findUnique({ where: { weekId: wk.id }, include: { items: true } });
+    const stages = new Set(sl?.items.map((i) => i.stage));
+    check("shot list: written, with before / filming / after", sl?.status === "ready" && stages.size === 3 && (sl?.items.length ?? 0) >= 6, JSON.stringify({ status: sl?.status, n: sl?.items.length, stages: [...stages] }));
+    const slText = JSON.stringify({ t: sl?.title, s: sl?.summary, n: sl?.importantNote, a: sl?.assets, i: sl?.items.map((i) => i.text) });
+    check("shot list: names the real food, no prices", /tray|dish|food|meal|feijoada|moqueca|acaraj|kitchen/i.test(slText) && !/\$\s?\d/.test(slText), slText.slice(0, 500));
+    const f2 = await collect("Export week");
+    check("export: opens the export card", f2.cards.some((c) => c.type === "export" && c.weekId === wk.id), JSON.stringify(f2.cards));
   }
 }
 

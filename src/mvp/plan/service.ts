@@ -26,9 +26,12 @@ export class PlanInputError extends Error {}
 const fmtDay = (iso: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
 const isoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
-async function sayInConversation(conversationId: string | null, display: { text: string; card?: Record<string, unknown>; replies?: { options: string[] } }) {
+// A message the app adds after the owner taps something (Save strategy, Save week). Duke reads
+// `note` first, so he knows the owner did it in the app and he didn't write "Saved" on his own.
+async function sayInConversation(conversationId: string | null, display: { text: string; card?: Record<string, unknown>; replies?: { options: string[] } }, note?: string) {
   if (!conversationId) return;
-  await db.message.create({ data: { conversationId, role: "assistant", content: [{ type: "text", text: display.text }], display: display as object } });
+  const text = note ? `(App note, not shown to the owner: ${note})\n${display.text}` : display.text;
+  await db.message.create({ data: { conversationId, role: "assistant", content: [{ type: "text", text }], display: display as object } });
   await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
 }
 
@@ -117,7 +120,7 @@ export async function saveStrategy(userId: string, id: string, tz: string) {
     text: `Saved. How do you want to use ${s.title} now?`,
     card: { type: "notice", text: "Strategy saved", link: `/strategies/${s.id}`, linkLabel: "View" },
     replies: { options: ["Plan this week", "Just one post", "A few posts", "A campaign"] },
-  });
+  }, `the owner tapped Save on the strategy card. Strategy "${s.title}" (id ${s.id}) is saved and active from ${start}.`);
   return saved;
 }
 
@@ -337,7 +340,7 @@ export async function saveWeek(userId: string, tz: string, weekId: string, input
       : "Saved. Want to start producing? I can list everything to shoot this week in one place.",
     card: { type: "notice", text: `Week saved · ${n} ${n === 1 ? "post" : "posts"}`, link: "/calendar", linkLabel: "Open calendar" },
     replies: { options: ["Shot list for the week", "Export week", "Later"] },
-  });
+  }, `the owner tapped Save in the Save week sheet. Week ${weekStart} (id ${w.id}) is saved: ${n} posts scheduled, email reminders ${input.reminders ? "on" : "off"}.`);
   return getWeek(userId, weekId, tz);
 }
 

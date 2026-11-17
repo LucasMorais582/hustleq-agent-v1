@@ -8,6 +8,7 @@ import { DAYS, postingPace, weekStartFor } from "../plan/timing.js";
 import {
   BASE_PILLARS, createDraftStrategy, createDraftWeek, FORMATS, getStrategy, planningContext, PlanInputError, presentStrategy, revisePost,
 } from "../plan/service.js";
+import { requestShotList } from "../production/shotList.js";
 
 // Duke's tools. Order and wording are part of the cached prefix: keep them stable.
 // Tools read, or propose; nothing that changes data runs without the owner's tap.
@@ -305,7 +306,42 @@ const TOOLS: ToolDef[] = [
       return { shown_to_owner: true };
     },
   },
+  {
+    tool: {
+      name: "build_shot_list",
+      description: "Build the list of what to film for a saved week (5.6): one session plan, people, location, what to have ready, and a checklist. It is written in the background and opens on its own page; the card links to it. Leave weekId out to use the latest saved week.",
+      input_schema: { type: "object", properties: { weekId: { type: "string" } }, additionalProperties: false },
+    },
+    input: z.object({ weekId: z.string().uuid().optional() }),
+    async run(input: { weekId?: string }, ctx) {
+      const week = await findWeek(ctx.userId, input.weekId);
+      if (!week) return { error: "No saved week yet. Offer to plan one." };
+      const list = await requestShotList(ctx.userId, week.id);
+      ctx.emitCard({ type: "shot_list", weekId: week.id });
+      return { weekId: week.id, status: list?.status ?? "pending", note: "Card shown with 'Open what to film'. The list is ready in a few seconds." };
+    },
+  },
+  {
+    tool: {
+      name: "open_export",
+      description: "Open the Export sheet for a saved week (5.8): share link for a photographer or designer, PDF, or CSV for Notion, Trello or Google Sheets. The owner picks the format and what to include. Leave weekId out to use the latest saved week.",
+      input_schema: { type: "object", properties: { weekId: { type: "string" } }, additionalProperties: false },
+    },
+    input: z.object({ weekId: z.string().uuid().optional() }),
+    async run(input: { weekId?: string }, ctx) {
+      const week = await findWeek(ctx.userId, input.weekId);
+      if (!week) return { error: "No saved week yet. Offer to plan one." };
+      ctx.emitCard({ type: "export", weekId: week.id });
+      return { shown_to_owner: true, weekId: week.id };
+    },
+  },
 ];
+
+// The week named, or the latest saved one.
+async function findWeek(userId: string, weekId?: string) {
+  if (weekId) return db.week.findFirst({ where: { id: weekId, userId } });
+  return db.week.findFirst({ where: { userId, status: "saved" }, orderBy: [{ startsOn: "desc" }, { updatedAt: "desc" }] });
+}
 
 export const DUKE_TOOLS: Anthropic.Tool[] = TOOLS.map((t) => t.tool);
 
