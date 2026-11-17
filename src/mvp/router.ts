@@ -6,6 +6,7 @@ import inviteRoutes from "./invites/routes.js";
 import adminRoutes from "./admin/routes.js";
 import onboardingRoutes from "./onboarding/routes.js";
 import businessRoutes from "./business/routes.js";
+import { postsRouter, strategiesRouter, weeksRouter } from "./plan/routes.js";
 import { errorHandler } from "./http/errors.js";
 
 // Everything the MVP app calls lives under /v1, with its own CORS list (APP_ORIGINS).
@@ -22,6 +23,9 @@ export function mvpRouter() {
   router.use("/admin", adminRoutes);
   router.use("/onboarding", onboardingRoutes);
   router.use("/business-profile", businessRoutes);
+  router.use("/strategies", strategiesRouter);
+  router.use("/weeks", weeksRouter);
+  router.use("/posts", postsRouter);
 
   router.use((_req, res) => {
     res.status(404).json({ error: { code: "not_found", message: "Not found.", time: new Date().toISOString() } });

@@ -8,9 +8,13 @@ generator client {
   output   = "../../src/generated/mvp"
 }
 
+// MVP_DATABASE_URL: Supabase transaction pooler (port 6543, pgbouncer=true, connection_limit) for the app.
+// MVP_DIRECT_URL: session connection (port 5432) for migrations. The session pooler allows only 15 clients
+// for the whole project (demo + MVP + jobs), so the app must not use it for queries.
 datasource db {
-  provider = "postgresql"
-  url      = env("MVP_DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("MVP_DATABASE_URL")
+  directUrl = env("MVP_DIRECT_URL")
 }
 
 // ---------- Account and access ----------
@@ -266,16 +270,22 @@ model AiUsage {
 // ---------- Plan ----------
 
 model Strategy {
-  id        String   @id @default(uuid())
-  userId    String
-  title     String
-  summary   String?
-  goals     Json?
-  status    String   @default("active") // draft | active | archived
-  startsOn  DateTime? @db.Date
-  endsOn    DateTime? @db.Date
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(uuid())
+  userId         String
+  title          String    // the strategy's name, e.g. "Taste the Tradition"
+  objective      String?
+  durationWeeks  Int       @default(8)
+  staticPerWeek  Int       @default(2) // feed posts and carousels
+  videosPerWeek  Int       @default(2) // Reels
+  storiesPerWeek Int       @default(3)
+  status         String    @default("draft") // draft | saved (active/ended comes from the dates)
+  startsOn       DateTime? @db.Date
+  endsOn         DateTime? @db.Date
+  conversationId String?   // where it was created ("Open conversation")
+  summary        String?
+  goals          Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pillars Pillar[]
@@ -288,8 +298,10 @@ model Pillar {
   id          String  @id @default(uuid())
   strategyId  String
   name        String
+  baseType    String? // attract | educate | trust | sell | community | entertain | custom
   description String?
-  share       Int?    // % of posts
+  goal        String? // "Goal: 20 new followers"
+  share       Int?
   position    Int     @default(0)
 
   strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
@@ -300,8 +312,10 @@ model Week {
   id         String   @id @default(uuid())
   userId     String
   strategyId String?
-  startsOn   DateTime @db.Date
+  startsOn   DateTime @db.Date // Monday, in the owner's timezone
   status     String   @default("draft") // draft | saved
+  bestTime   String?  // "19:00", from the last posts' engagement
+  conversationId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -310,7 +324,7 @@ model Week {
   posts    Post[]
   shotList ShotList?
 
-  @@unique([userId, startsOn])
+  @@index([userId, startsOn])
 }
 
 enum PostStatus {
@@ -329,11 +343,18 @@ model Post {
   status             PostStatus @default(draft)
   scheduledAt        DateTime?
   format             String?    // reel | carousel | feed | story
+  contentType        String?    // static | video | story (counts per week follow the strategy)
   title              String?
   hook               String?
   caption            String?
-  creativeDirection  Json?
-  productionGuidance Json?
+  position           Int        @default(0)
+  // Full details (5.2b), written in the background after the skeleton.
+  idea               Json?      // { hook, goal, funnelStage }
+  captionParts       Json?      // { hook, body, callToAction }
+  hashtags           String[]
+  creativeDirection  Json?      // visualConcept, openingImpact, visualNarrative, mood, colorAndType, audienceEmotion, platformElements, execution
+  productionGuidance Json?      // objective, recordingPlan, editing, assets, checklist
+  postingReminders   String[]
   detailsStatus      String     @default("pending") // pending | ready | failed
   reminderEmail      Boolean    @default(true)
   createdAt          DateTime   @default(now())

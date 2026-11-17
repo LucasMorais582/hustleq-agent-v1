@@ -10,8 +10,9 @@ const schedules: { name: string; cron: string; tz: string }[] = [];
 let boss: PgBoss | null = null;
 
 function connectionString() {
-  const raw = process.env.MVP_DATABASE_URL;
-  if (!raw) throw new Error("MVP_DATABASE_URL is not set");
+  // pg-boss needs a session connection (LISTEN/NOTIFY, advisory locks): the direct URL, with few clients.
+  const raw = process.env.MVP_DIRECT_URL ?? process.env.MVP_DATABASE_URL;
+  if (!raw) throw new Error("MVP_DIRECT_URL is not set");
   // node-postgres rejects Prisma-only params such as pgbouncer and schema.
   const url = new URL(raw);
   url.searchParams.delete("pgbouncer");
@@ -35,7 +36,7 @@ export async function startQueue({ work = true } = {}) {
     connectionString: connectionString(),
     schema: process.env.MVP_JOBS_SCHEMA || "mvp_jobs",
     ssl: { rejectUnauthorized: false },
-    max: 4,
+    max: 2,
   });
   boss.on("error", (err) => console.error("[jobs] error", err));
   await boss.start();
@@ -43,7 +44,8 @@ export async function startQueue({ work = true } = {}) {
   for (const [name, handler] of handlers) {
     await boss.createQueue(name);
     if (work) {
-      await boss.work(name, async (jobs) => {
+      // Up to 4 jobs of a kind at once (e.g. the details of a week's posts).
+      await boss.work(name, { localConcurrency: 4 }, async (jobs) => {
         for (const job of jobs) await handler(job.data);
       });
     }

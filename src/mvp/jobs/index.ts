@@ -1,6 +1,7 @@
 import { runInviteDaily } from "../invites/service.js";
 import { syncInstagram } from "../instagram/own.js";
 import { JOB_PREPARE, prepareOnboarding } from "../onboarding/service.js";
+import { writePostDetails } from "../plan/details.js";
 import { defineJob, defineSchedule } from "./queue.js";
 
 // Registry of every job.
@@ -9,6 +10,7 @@ export const JOBS = {
   invitesDaily: "invites-daily", // reminders, last day and expiry of invites
   instagramSync: "instagram-sync", // own profile + 12 posts, at invite time
   onboardingPrepare: JOB_PREPARE, // read the posts for onboarding (Claude)
+  postDetails: "post-details", // full details of one post (Claude)
 } as const;
 
 export let lastPing: { at: Date; data: unknown } | null = null;
@@ -29,4 +31,7 @@ defineJob<{ handle: string }>(JOBS.instagramSync, async ({ handle }) => {
 });
 defineJob<{ userId: string }>(JOBS.onboardingPrepare, async ({ userId }) => {
   await prepareOnboarding(userId);
+});
+defineJob<{ postId: string }>(JOBS.postDetails, async ({ postId }) => {
+  await writePostDetails(postId);
 });

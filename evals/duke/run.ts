@@ -3,6 +3,7 @@ import "../../src/config/env.js";
 // instructions, tools or the onboarding analysis:   npm run eval:duke
 // Costs a few cents per run. Uses the mvp_test schema.
 process.env.MVP_DATABASE_URL = process.env.MVP_TEST_DATABASE_URL;
+process.env.MVP_DIRECT_URL = process.env.MVP_TEST_DIRECT_URL;
 const { db } = await import("../../src/mvp/db.js");
 const { analyzeInstagram } = await import("../../src/mvp/onboarding/analysis.js");
 const { runDukeTurn } = await import("../../src/mvp/duke/chat.js");
@@ -79,6 +80,45 @@ check("out of scope: short, and offers Instagram help instead", /instagram|post|
 
 const t5 = await turn("Write a caption for our weekly meal prep post. Boxes are $14.");
 check("don't post: keeps the price out of the caption (profile says Prices)", !/\$\s?14/.test(t5.out) || /price/i.test(t5.out), t5.out.slice(0, 500));
+
+// ---------- 3. Strategy and week (phase 3a) ----------
+await db.usage.deleteMany({ where: { userId: user.id } }); // the daily cap would stop the eval
+const conv = await db.conversation.create({ data: { userId: user.id, title: "eval strategy" } });
+const collect = async (text: string) => {
+  let out = "";
+  const cards: Record<string, unknown>[] = [];
+  let replies: string[] = [];
+  await runDukeTurn(user.id, conv.id, text, { text: (d) => (out += d), card: (c) => cards.push(c), replies: (r) => (replies = r) });
+  return { out, cards, replies };
+};
+const s1 = await collect("I want a new strategy. Goal: more catering orders for the holidays.");
+check("strategy: asks one thing at a time (duration) with replies", s1.replies.some((r) => /week/i.test(r)) && s1.cards.length === 0, `${s1.out.slice(0, 200)} ${JSON.stringify(s1.replies)}`);
+const s2 = await collect("8 weeks");
+const mix = s2.cards.find((c) => c.type === "weekly_mix");
+check("strategy: shows the weekly mix picker", Boolean(mix), JSON.stringify(s2.cards));
+const s3 = await collect("2 static posts, 2 videos and 3 stories a week.");
+const stratCard = s3.cards.find((c) => c.type === "strategy");
+check("strategy: drafts a strategy card", Boolean(stratCard), s3.out.slice(0, 300));
+if (stratCard) {
+  const st = await db.strategy.findUniqueOrThrow({ where: { id: String(stratCard.strategyId) }, include: { pillars: true } });
+  check("strategy: 8 weeks, 2/2/3, 1-4 pillars", st.durationWeeks === 8 && st.staticPerWeek === 2 && st.videosPerWeek === 2 && st.storiesPerWeek === 3 && st.pillars.length >= 1 && st.pillars.length <= 4, JSON.stringify({ d: st.durationWeeks, s: st.staticPerWeek, v: st.videosPerWeek, st: st.storiesPerWeek, p: st.pillars.length }));
+  check("strategy: no invented numbers in objective or goals", !/\d/.test(`${st.objective} ${st.pillars.map((p) => p.goal).join(" ")}`.replace(/8 weeks?/g, "")), `${st.objective} | ${st.pillars.map((p) => p.goal).join(" | ")}`);
+  const { saveStrategy } = await import("../../src/mvp/plan/service.js");
+  await saveStrategy(user.id, st.id, "America/New_York");
+  const w1 = await collect("Plan this week");
+  const weekCard = w1.cards.find((c) => c.type === "week");
+  check("week: drafts a week card", Boolean(weekCard), w1.out.slice(0, 300));
+  if (weekCard) {
+    const wk = await db.week.findUniqueOrThrow({ where: { id: String(weekCard.weekId) }, include: { posts: true } });
+    const by = (t: string) => wk.posts.filter((p) => p.contentType === t).length;
+    check("week: follows the strategy (2 static, 2 videos, 3 stories)", by("static") === 2 && by("video") === 2 && by("story") === 3, JSON.stringify({ static: by("static"), video: by("video"), story: by("story") }));
+    check("week: says when posts go out", /\d{1,2}(:\d{2})?\s?(AM|PM)/i.test(w1.out), w1.out.slice(0, 300));
+    const before = wk.posts.find((p) => p.format !== "reel" && p.contentType === "static");
+    const w2 = await collect(`Make the "${before?.title}" post a Reel.`);
+    const after = before ? await db.post.findUniqueOrThrow({ where: { id: before.id } }) : null;
+    check("week: refine changes that post to a Reel", after?.format === "reel", `${w2.out.slice(0, 200)}`);
+  }
+}
 
 // ---------- Report ----------
 const failed = results.filter((r) => !r.ok);

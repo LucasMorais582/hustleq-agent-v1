@@ -80,7 +80,8 @@ describe("Duke turn", () => {
     expect(third.messages.at(-1)?.role).toBe("user");
 
     const saved = await db.message.findMany({ where: { conversationId: conv.body.id }, orderBy: { createdAt: "asc" } });
-    expect(saved.map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant", "user", "assistant"]);
+    // The first row is Duke's opening question (4.0b).
+    expect(saved.map((m) => m.role)).toEqual(["assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
     expect(await db.toolCall.count({ where: { conversationId: conv.body.id } })).toBe(2);
 
     const view = await request(app).get(`/v1/conversations/${conv.body.id}`).set(auth(u.token));
@@ -95,7 +96,7 @@ describe("Duke turn", () => {
     script.turns = []; // streamClaude will throw on undefined
     const res = await request(app).post(`/v1/conversations/${conv.body.id}/messages`).set(auth(u.token)).send({ text: "hi" }).buffer(true).parse((r, cb) => { let d = ""; r.on("data", (c: Buffer) => (d += c)); r.on("end", () => cb(null, d)); });
     expect(events(res.body as string).at(-1)?.event).toBe("error");
-    expect(await db.message.count({ where: { conversationId: conv.body.id } })).toBe(0);
+    expect(await db.message.count({ where: { conversationId: conv.body.id } })).toBe(1); // only Duke's opening question
   });
 
   it("drops earlier thinking blocks from the history", async () => {
@@ -107,6 +108,7 @@ describe("Duke turn", () => {
     script.turns = [msg([{ type: "text", text: "ok" } as Anthropic.TextBlock], "end_turn")];
     await request(app).post(`/v1/conversations/${conv.body.id}/messages`).set(auth(u.token)).send({ text: "c" });
     const sent = script.calls.at(-1) as { messages: { content: { type: string }[] | string }[] };
+    expect(sent.messages[0]).toMatchObject({ role: "user" }); // the API needs a user turn first
     const types = sent.messages.flatMap((m) => (Array.isArray(m.content) ? m.content.map((b) => b.type) : ["text"]));
     expect(types).not.toContain("thinking");
   });

@@ -4,6 +4,9 @@ import { callClaude, streamClaude, textOf } from "../ai/client.js";
 import { DUKE_INSTRUCTIONS } from "./instructions.js";
 import { RepliesFilter } from "./replies.js";
 import { DUKE_TOOLS, runTool } from "./tools.js";
+import { activeStrategy } from "../plan/service.js";
+import { cachedInstagram } from "../instagram/own.js";
+import { bestTime, timeLabel, weekStartFor } from "../plan/timing.js";
 
 // One owner message → Duke's answer, as an agent loop:
 // Claude answers with text and/or tool calls; the backend runs the tools and loops until Claude is done.
@@ -11,25 +14,46 @@ import { DUKE_TOOLS, runTool } from "./tools.js";
 // failure loses nothing and "Try again" sends the same message again.
 
 const MAX_STEPS = 6;
-export const TURN_TIMEOUT_MS = 45_000;
+// A turn fails when nothing happens for this long (no text, no tool finishing), not after a fixed total.
+export const STALL_TIMEOUT_MS = 40_000;
 
 export type TurnEvents = {
   text: (delta: string) => void;
+  status?: (label: string) => void;
   card: (card: Record<string, unknown>) => void;
   replies: (options: string[]) => void;
 };
 
 type StoredContent = Anthropic.ContentBlockParam[] | Anthropic.ContentBlock[];
 
-function contextBlock(user: { timezone: string; instagramHandle: string | null }, businessName: string | null) {
-  const today = new Intl.DateTimeFormat("en-US", { timeZone: user.timezone, weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
-  return [
-    `Today is ${today} (${user.timezone}).`,
+async function contextBlock(userId: string, user: { timezone: string; instagramHandle: string | null }, businessName: string | null) {
+  const tz = user.timezone;
+  const today = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  // What planning needs, given up front so Duke can draft a week in one step.
+  const [strategy, bundle] = await Promise.all([activeStrategy(userId, tz), user.instagramHandle ? cachedInstagram(user.instagramHandle) : null]);
+  const best = bestTime(bundle?.posts ?? [], tz);
+  const lines = [
+    `Today is ${today} (${tz}). This week starts ${weekStartFor("this", tz)}, next week starts ${weekStartFor("next", tz)} (Mondays).`,
     `Business: ${businessName ?? "unknown"}${user.instagramHandle ? ` · Instagram @${user.instagramHandle}` : ""}.`,
+    `Best time to post: ${timeLabel(best.time)} (${best.time})${best.fromData ? ", from the engagement of their last posts" : ", a default: not enough posts to know yet"}.`,
+    strategy
+      ? `Active strategy: "${strategy.name}" (id ${strategy.id}), week ${strategy.weekNumber} of ${strategy.durationWeeks}. Each week: ${strategy.staticPerWeek} static (feed or carousel), ${strategy.videosPerWeek} videos (reel), ${strategy.storiesPerWeek} stories. Pillars: ${strategy.pillars.map((p) => `${p.name} (${p.description ?? ""})`).join("; ")}.`
+      : "No active strategy.",
     // Remove lines from here as the features ship.
-    "In this test version you can read and update the Business Profile and read the Instagram numbers. Strategies, weekly plans, campaigns, notes and Explore are coming soon: if asked, say they're coming soon and offer what you can do now.",
-  ].join("\n");
+    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies and plan weeks (draft, refine, save). Shot lists, export, campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
+  ];
+  return lines.join("\n");
 }
+
+const STATUS: Record<string, string> = {
+  get_business_profile: "Reading your Business Profile…",
+  get_instagram_summary: "Reading your Instagram…",
+  list_strategies: "Looking at your strategies…",
+  draft_strategy: "Building your strategy…",
+  get_planning_context: "Checking your week…",
+  draft_week: "Planning your week…",
+  revise_week_post: "Changing the post…",
+};
 
 // Earlier turns go back without thinking blocks: the system context can change between turns
 // (date, profile), and old thinking would then be rejected. The current turn keeps them.
@@ -45,11 +69,13 @@ export async function runDukeTurn(userId: string, conversationId: string, userTe
     role: m.role as "user" | "assistant",
     content: withoutThinking(m.content as unknown as StoredContent),
   }));
+  // Some conversations open with Duke (onboarding, "New conversation"); the API needs a user turn first.
+  if (messages[0]?.role === "assistant") messages.unshift({ role: "user", content: "(The owner opened this conversation.)" });
   messages.push({ role: "user", content: userText });
 
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: DUKE_INSTRUCTIONS, cache_control: { type: "ephemeral" } },
-    { type: "text", text: contextBlock(user, user.business?.businessName ?? null) },
+    { type: "text", text: await contextBlock(userId, user, user.business?.businessName ?? null) },
   ];
 
   const rows: { role: "user" | "assistant"; content: unknown; display: Record<string, unknown> | null }[] = [];
@@ -59,15 +85,28 @@ export async function runDukeTurn(userId: string, conversationId: string, userTe
   for (let step = 0; step < MAX_STEPS; step++) {
     const filter = new RepliesFilter();
     const cards: Record<string, unknown>[] = [];
-    const message = await streamClaude(
-      { role: "duke", feature: "chat", userId, effort: "medium" },
-      { max_tokens: 16000, system, tools: DUKE_TOOLS, messages },
-      (delta) => {
-        const out = filter.push(delta);
-        if (out) on.text(out);
-      },
-      signal
-    );
+    // Each model call gets its own stall timer, reset by every piece of text that arrives.
+    const step_ = new AbortController();
+    let timer = setTimeout(() => step_.abort(), STALL_TIMEOUT_MS);
+    const onOuterAbort = () => step_.abort();
+    signal?.addEventListener("abort", onOuterAbort);
+    let message: Anthropic.Message;
+    try {
+      message = await streamClaude(
+        { role: "duke", feature: "chat", userId, effort: "low" },
+        { max_tokens: 16000, system, tools: DUKE_TOOLS, messages },
+        (delta) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => step_.abort(), STALL_TIMEOUT_MS);
+          const out = filter.push(delta);
+          if (out) on.text(out);
+        },
+        step_.signal
+      );
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onOuterAbort);
+    }
     const { rest, replies: found } = filter.finish();
     if (rest) on.text(rest);
     if (found.length) replies = found;
@@ -89,8 +128,11 @@ export async function runDukeTurn(userId: string, conversationId: string, userTe
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const use of toolUses) {
       const started = Date.now();
+      on.status?.(STATUS[use.name] ?? "Working on it…");
       const result = await runTool(use.name, use.input, {
         userId,
+        conversationId,
+        timezone: user.timezone,
         emitCard: (card) => {
           cards.push(card);
           on.card(card);

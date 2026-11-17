@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
+import { Prisma } from "../../generated/mvp/index.js";
 import { AppError, notFound } from "../http/errors.js";
 import { currentUser, requireUser } from "../auth/middleware.js";
-import { runDukeTurn, TURN_TIMEOUT_MS } from "../duke/chat.js";
+import { runDukeTurn } from "../duke/chat.js";
 
 // Phase 0: list, create, read, delete, pin. Every query is scoped to the logged-in user;
 // someone else's id answers 404, never 403, so ids can't be probed.
@@ -18,12 +19,34 @@ async function ownConversation(userId: string, id: string) {
   return conv;
 }
 
+// 4.0: pinned first, then recent; each with the last message and the object it's tied to.
 router.get("/", async (req, res) => {
   const me = currentUser(req);
-  const items = await db.conversation.findMany({
-    where: { userId: me.id },
+  const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 80) : "";
+  const convs = await db.conversation.findMany({
+    where: { userId: me.id, ...(q ? { title: { contains: q, mode: "insensitive" as const } } : {}) },
     orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
+    take: 100,
     select: { id: true, title: true, pinned: true, objectType: true, objectId: true, updatedAt: true },
+  });
+  const ids = convs.map((c) => c.id);
+  const lasts = ids.length
+    ? await db.message.findMany({ where: { conversationId: { in: ids }, NOT: { display: { equals: Prisma.DbNull } } }, orderBy: { createdAt: "desc" }, distinct: ["conversationId"], select: { conversationId: true, role: true, display: true } })
+    : [];
+  const strategies = await db.strategy.findMany({ where: { id: { in: convs.filter((c) => c.objectType === "strategy").map((c) => c.objectId!) } }, select: { id: true, title: true } });
+  const weeks = await db.week.findMany({ where: { id: { in: convs.filter((c) => c.objectType === "week").map((c) => c.objectId!) } }, select: { id: true, startsOn: true } });
+  const day = (d: Date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);
+  const items = convs.map((c) => {
+    const last = lasts.find((l) => l.conversationId === c.id);
+    const text = (last?.display as { text?: string } | null)?.text ?? "";
+    let linked: string | null = null;
+    if (c.objectType === "onboarding") linked = "Business Profile";
+    if (c.objectType === "strategy") linked = `Strategy · ${strategies.find((s) => s.id === c.objectId)?.title ?? ""}`;
+    if (c.objectType === "week") {
+      const w = weeks.find((x) => x.id === c.objectId);
+      if (w) linked = `Week · ${day(w.startsOn)} to ${day(new Date(w.startsOn.getTime() + 6 * 864e5))}`;
+    }
+    return { ...c, lastMessage: text ? `${last!.role === "user" ? "You" : "Duke"}: ${text.replace(/\s+/g, " ").slice(0, 90)}` : null, linked };
   });
   res.json({ items });
 });
@@ -32,6 +55,11 @@ router.post("/", async (req, res) => {
   const me = currentUser(req);
   const body = z.object({ title: z.string().trim().max(120).optional() }).parse(req.body ?? {});
   const conv = await db.conversation.create({ data: { userId: me.id, title: body.title ?? null } });
+  // 4.0b: Duke opens the conversation.
+  const text = "New conversation. What do you want to work on?";
+  await db.message.create({
+    data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text }], display: { text, replies: { options: ["Plan next week", "A post idea", "A campaign", "Ask a question"] } } },
+  });
   res.status(201).json(conv);
 });
 
@@ -82,23 +110,23 @@ router.post("/:id/messages", async (req, res) => {
   res.flushHeaders();
   const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
+  // Stalls are handled per model call inside the turn; this only stops work when the app goes away.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TURN_TIMEOUT_MS);
   res.on("close", () => { if (!res.writableEnded) controller.abort(); });
   activeTurns.add(id);
   try {
     await runDukeTurn(me.id, id, text, {
       text: (delta) => send("text", { delta }),
+      status: (label) => send("status", { label }),
       card: (card) => send("card", { card }),
       replies: (options) => send("replies", { options }),
     }, controller.signal);
     send("done", {});
   } catch (error) {
-    const timedOut = controller.signal.aborted;
+    const timedOut = error instanceof Error && (error.name === "AbortError" || /abort/i.test(error.message));
     if (!timedOut) console.error("[duke] turn failed", error);
     send("error", { code: timedOut ? "timeout" : "duke_failed", message: "I couldn’t finish that. Nothing was lost.", time: new Date().toISOString() });
   } finally {
-    clearTimeout(timer);
     activeTurns.delete(id);
     res.end();
   }

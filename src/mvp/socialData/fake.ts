@@ -32,7 +32,8 @@ export const fakeSource: SocialDataSource = {
         url: `https://www.instagram.com/p/fake${i + 1}/`,
         format,
         caption: `[Fake post ${i + 1} from @${handle}]`,
-        publishedAt: new Date(now - (i * 2 + 1) * 864e5).toISOString(),
+        // Evenings and lunchtimes, New York time, like a real account.
+        publishedAt: new Date(Math.floor((now - (i * 2 + 1) * 864e5) / 864e5) * 864e5 + [23, 16, 0, 23, 17, 1][i % 6]! * 3600e3).toISOString(),
         likes,
         comments: Math.floor(likes * (0.02 + rand() * 0.08)),
         views: format === "reel" ? Math.floor(followers * (0.3 + rand() * 2)) : null,

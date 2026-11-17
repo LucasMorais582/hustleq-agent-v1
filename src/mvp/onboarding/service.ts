@@ -138,9 +138,9 @@ function questionDisplay(analysis: Analysis | null | undefined, index: number, f
   const a = analysis?.fields?.[field.key];
   const options = [...new Set([a?.guess, ...(a?.suggestions ?? [])].map((s) => s?.trim()).filter((s): s is string => Boolean(s)))].slice(0, 4);
   const intro = first ? "Great. A few questions to finish your Business Profile. " : "Got it. ";
-  const guess = options.length ? " From your posts, I’d guess:" : "";
+  // The options already come from the posts; Duke just asks (no "I'd guess").
   return {
-    text: `${intro}${field.question}${guess}`,
+    text: `${intro}${field.question}`,
     card: { type: "question", field: field.key, index: index + 1, total: PROFILE_FIELDS.length },
     replies: { options: [...options, R.somethingElse], multi: true, placeholder: "Or type your own…" },
   };
