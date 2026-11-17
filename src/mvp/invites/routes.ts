@@ -8,6 +8,7 @@ import { createSession, hashToken } from "../auth/sessions.js";
 import { publicUser } from "../auth/routes.js";
 import { isValidTimezone } from "../lib/time.js";
 import { INVITE_TZ } from "./service.js";
+import { startPreparation } from "../onboarding/service.js";
 
 // Public side of an invite: read it (screen 1.2 or E.3) and accept it (create password).
 const router = Router();
@@ -76,6 +77,8 @@ router.post("/:token/accept", async (req, res) => {
   });
 
   const session = await createSession(db, user.id, req.get("user-agent"));
+  // Start reading the posts now; onboarding step 2 needs it in a few seconds.
+  startPreparation(user.id).catch((error) => console.error("[onboarding] prepare failed", error));
   res.status(201).json({ token: session.token, expiresAt: session.expiresAt, user: publicUser(user) });
 });
 

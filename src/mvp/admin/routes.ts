@@ -5,6 +5,10 @@ import { AppError, notFound } from "../http/errors.js";
 import { currentUser, requireAdmin, requireUser } from "../auth/middleware.js";
 import { hashToken } from "../auth/sessions.js";
 import { socialData, SocialDataUnavailable, type IgProfileBundle } from "../socialData/index.js";
+import { enqueueSafe } from "../jobs/queue.js";
+import { resetOnboardingForNewHandle } from "../onboarding/service.js";
+import { appUrl, sendEmail } from "../email/send.js";
+import { accountUpdatedEmail } from "../email/templates.js";
 import { expiresAtFor, instagramTaken, inviteToken, newInviteId, sendInviteEmail } from "../invites/service.js";
 
 // Admin is a role inside the app. Phase 1: invites (check the Instagram, reserve it, send).
@@ -76,6 +80,8 @@ router.post("/invites", async (req, res) => {
     },
   });
   const email = await sendInviteEmail(invite);
+  // Initial Profile Sync: onboarding opens with the profile and posts already read.
+  await enqueueSafe("instagram-sync", { handle: invite.instagramHandle });
   await audit(me.id, "invite.create", { inviteId: invite.id, email: invite.email, handle: invite.instagramHandle });
   res.status(201).json({ invite: present(invite), emailStatus: email.status });
 });
@@ -109,6 +115,44 @@ router.post("/invites/:id/revoke", async (req, res) => {
   const updated = await db.invite.update({ where: { id }, data: { status: "revoked" } });
   await audit(me.id, "invite.revoke", { inviteId: id });
   res.json({ invite: present(updated) });
+});
+
+// ---------- "Not my account" requests (E.4) ----------
+
+router.get("/account-requests", async (_req, res) => {
+  const rows = await db.accountChangeRequest.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
+  const users = await db.user.findMany({ where: { id: { in: rows.map((r) => r.userId) } }, include: { business: true } });
+  res.json({
+    items: rows.map((r) => {
+      const u = users.find((x) => x.id === r.userId);
+      return { ...r, email: u?.email ?? null, businessName: u?.business?.businessName ?? null };
+    }),
+  });
+});
+
+router.post("/account-requests/:id/resolve", async (req, res) => {
+  const me = currentUser(req);
+  const { id } = idParam.parse(req.params);
+  const { handle } = z.object({ handle: handleSchema }).parse(req.body);
+  const request = await db.accountChangeRequest.findUnique({ where: { id } });
+  if (!request || request.status !== "open") throw notFound("Request not found.");
+
+  const bundle = await lookup(handle);
+  if (!bundle) throw new AppError(404, "instagram_not_found", `We couldn't find @${handle} on Instagram.`);
+  const taken = await instagramTaken(bundle.profile.id);
+  const owner = await db.user.findUnique({ where: { instagramProfileId: bundle.profile.id } });
+  if (taken && owner?.id !== request.userId) throw new AppError(409, "instagram_taken", "This Instagram already belongs to an account or an open invite.");
+
+  const user = await db.user.update({
+    where: { id: request.userId },
+    data: { instagramHandle: bundle.profile.handle, instagramProfileId: bundle.profile.id },
+    include: { onboarding: true },
+  });
+  await db.accountChangeRequest.update({ where: { id }, data: { status: "resolved", resolvedAt: new Date() } });
+  await resetOnboardingForNewHandle(user.id, user.onboarding?.conversationId ?? null);
+  await sendEmail(user.email, accountUpdatedEmail({ handle: bundle.profile.handle, url: appUrl("/onboarding") }), user.id);
+  await audit(me.id, "account.change_instagram", { requestId: id, from: request.currentHandle, to: bundle.profile.handle }, user.id);
+  res.json({ ok: true });
 });
 
 function present(i: { id: string; email: string; businessName: string; instagramHandle: string; status: string; createdAt: Date; expiresAt: Date; acceptedAt?: Date | null; lastReminderAt?: Date | null }) {

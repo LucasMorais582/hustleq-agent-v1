@@ -60,6 +60,20 @@ export async function enqueue<T extends object>(name: string, data: T, options?:
   return boss.send(name, data, options ?? {});
 }
 
+// For request handlers: queue work if the worker is up, never fail the request because of it.
+export async function enqueueSafe<T extends object>(name: string, data: T, options?: { singletonKey?: string }) {
+  if (!boss) {
+    console.warn(`[jobs] queue not started, skipped ${name}`);
+    return null;
+  }
+  try {
+    return await boss.send(name, data, options ?? {});
+  } catch (error) {
+    console.error(`[jobs] could not queue ${name}`, error);
+    return null;
+  }
+}
+
 export async function stopQueue() {
   await boss?.stop({ graceful: true });
   boss = null;

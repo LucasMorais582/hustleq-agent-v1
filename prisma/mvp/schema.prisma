@@ -141,30 +141,57 @@ model EmailLog {
 // ---------- Business ----------
 
 model BusinessProfile {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  businessName   String
-  whatYouSell    String?
-  city           String?
-  idealCustomer  String?
-  goals          String?
-  toneOfVoice    String?
-  differentials  String?
-  doNotPost      String?
-  postingCadence String?
-  updatedAt      DateTime @updatedAt
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  businessName     String
+  // The 9 fields of the spec (2.4 / 13.7), in this order.
+  whatYouDo        String?
+  niche            String?
+  location         String?
+  offers           String?
+  idealCustomer    String?
+  customerProblem  String?
+  customerChannels String?
+  doNotPost        String?
+  goals            String?
+  completedAt      DateTime? // set by "Looks good"
+  updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model OnboardingState {
-  userId      String    @id
-  step        Int       @default(1)
-  data        Json?
-  completedAt DateTime?
-  updatedAt   DateTime  @updatedAt
+  userId         String    @id
+  step           Int       @default(1) // 1 Instagram, 2 summary, 3 questions, 4 review and first strategy
+  status         String    @default("active") // active | paused (Not my account) | done
+  conversationId String?
+  data           Json?     // analysis, current question, sub-state
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Last profile + recent posts read for a handle (own account). Refreshed at most once a day.
+model InstagramCache {
+  handle    String   @id
+  profileId String
+  data      Json
+  source    String
+  fetchedAt DateTime @default(now())
+}
+
+// "Not my account" during onboarding: the team checks and fixes the handle.
+model AccountChangeRequest {
+  id              String    @id @default(uuid())
+  userId          String
+  currentHandle   String?
+  requestedHandle String
+  status          String    @default("open") // open | resolved
+  createdAt       DateTime  @default(now())
+  resolvedAt      DateTime?
+
+  @@index([status])
 }
 
 // ---------- Duke ----------

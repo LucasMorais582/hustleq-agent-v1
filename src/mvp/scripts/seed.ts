@@ -17,7 +17,16 @@ const user = await db.user.upsert({
 await db.businessProfile.upsert({
   where: { userId: user.id },
   update: {},
-  create: { userId: user.id, businessName: "Bahia Taste", whatYouSell: "Bahian food for events and meal delivery", city: "New York and New Jersey" },
+  create: {
+    userId: user.id,
+    businessName: "Bahia Taste",
+    whatYouDo: "Bahian food for events and weekly meal delivery",
+    niche: "Brazilian food",
+    location: "New York and New Jersey",
+    completedAt: new Date(),
+  },
 });
+// The test admin skips onboarding.
+await db.onboardingState.upsert({ where: { userId: user.id }, update: { status: "done", step: 4 }, create: { userId: user.id, status: "done", step: 4 } });
 console.log(`Test user ready: ${email} (role ${user.role})`);
 await db.$disconnect();

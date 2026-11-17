@@ -62,13 +62,31 @@ export async function callClaude(meta: CallMeta, params: CallParams) {
 }
 
 // Streaming version: pass onText to forward text as it arrives; resolves with the final message.
-export async function streamClaude(meta: CallMeta, params: CallParams, onText?: (delta: string) => void) {
+export async function streamClaude(meta: CallMeta, params: CallParams, onText?: (delta: string) => void, signal?: AbortSignal) {
   const startedAt = Date.now();
-  const stream = anthropic().messages.stream(buildBody(meta, params));
+  const stream = anthropic().messages.stream(buildBody(meta, params), signal ? { signal } : undefined);
   if (onText) stream.on("text", onText);
   const message = await stream.finalMessage();
   await record(meta, message.model, message.usage, startedAt);
   return message;
+}
+
+// Structured output: the model's answer is parsed against `format` (zodOutputFormat).
+export async function parseClaude<T>(
+  meta: CallMeta,
+  params: CallParams,
+  format: { type: "json_schema"; schema: Record<string, unknown>; parse(content: string): T }
+) {
+  const startedAt = Date.now();
+  const body = buildBody(meta, params);
+  const message = await anthropic().messages.parse({ ...body, output_config: { ...body.output_config, format } } as never);
+  await record(meta, message.model, message.usage, startedAt);
+  if (message.stop_reason === "refusal" || message.stop_reason === "max_tokens") {
+    throw new Error(`Claude stopped: ${message.stop_reason}`);
+  }
+  const parsed = (message as unknown as { parsed_output: T | null }).parsed_output;
+  if (parsed == null) throw new Error("Claude returned no parseable output");
+  return parsed;
 }
 
 export const textOf = (message: Anthropic.Message) =>

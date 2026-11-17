@@ -36,6 +36,7 @@ export const fakeSource: SocialDataSource = {
         likes,
         comments: Math.floor(likes * (0.02 + rand() * 0.08)),
         views: format === "reel" ? Math.floor(followers * (0.3 + rand() * 2)) : null,
+        thumbnailUrl: null,
       };
     });
 

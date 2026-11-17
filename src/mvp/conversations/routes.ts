@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
-import { notFound } from "../http/errors.js";
+import { AppError, notFound } from "../http/errors.js";
 import { currentUser, requireUser } from "../auth/middleware.js";
+import { runDukeTurn, TURN_TIMEOUT_MS } from "../duke/chat.js";
 
 // Phase 0: list, create, read, delete, pin. Every query is scoped to the logged-in user;
 // someone else's id answers 404, never 403, so ids can't be probed.
@@ -43,7 +44,8 @@ router.get("/:id", async (req, res) => {
     orderBy: { createdAt: "asc" },
     select: { id: true, role: true, display: true, createdAt: true },
   });
-  res.json({ ...conv, messages });
+  // Tool results have no display: the app never shows them.
+  res.json({ ...conv, messages: messages.filter((m) => m.display !== null) });
 });
 
 router.patch("/:id", async (req, res) => {
@@ -63,6 +65,43 @@ router.delete("/:id", async (req, res) => {
   await ownConversation(me.id, id);
   await db.conversation.delete({ where: { id } });
   res.status(204).end();
+});
+
+// Send a message to Duke. The answer streams back as server-sent events:
+// text {delta} · card {card} · replies {options} · done · error {code, message}.
+const activeTurns = new Set<string>();
+
+router.post("/:id/messages", async (req, res) => {
+  const me = currentUser(req);
+  const { id } = idParam.parse(req.params);
+  const { text } = z.object({ text: z.string().trim().min(1).max(4000) }).parse(req.body);
+  await ownConversation(me.id, id);
+  if (activeTurns.has(id)) throw new AppError(409, "busy", "Duke is still answering the last message.");
+
+  res.status(200).set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+  res.flushHeaders();
+  const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TURN_TIMEOUT_MS);
+  res.on("close", () => { if (!res.writableEnded) controller.abort(); });
+  activeTurns.add(id);
+  try {
+    await runDukeTurn(me.id, id, text, {
+      text: (delta) => send("text", { delta }),
+      card: (card) => send("card", { card }),
+      replies: (options) => send("replies", { options }),
+    }, controller.signal);
+    send("done", {});
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    if (!timedOut) console.error("[duke] turn failed", error);
+    send("error", { code: timedOut ? "timeout" : "duke_failed", message: "I couldn’t finish that. Nothing was lost.", time: new Date().toISOString() });
+  } finally {
+    clearTimeout(timer);
+    activeTurns.delete(id);
+    res.end();
+  }
 });
 
 export default router;

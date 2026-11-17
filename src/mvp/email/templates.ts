@@ -81,3 +81,21 @@ export const passwordResetEmail = (v: { email: string; url: string }) =>
     button: { label: "Set new password", url: v.url },
     notes: ["Didn’t ask for this? Ignore this email; your password stays the same."],
   });
+
+export const accountChangeTeamEmail = (v: { businessName: string; email: string; current: string | null; requested: string }) =>
+  build("account_change_team", `Not my account: ${v.businessName} asked for @${v.requested}`, {
+    eyebrow: "Team · onboarding",
+    title: "An owner says the Instagram is wrong",
+    body: [
+      `${esc(v.businessName)} (${esc(v.email)}) was invited with @${esc(v.current ?? "—")} and says the right account is <b>@${esc(v.requested)}</b>.`,
+      "Check it and fix it in Admin · Invites. We promised an answer within 24 hours on business days.",
+    ],
+  });
+
+export const accountUpdatedEmail = (v: { handle: string; url: string }) =>
+  build("account_updated", "Your Instagram is updated", {
+    eyebrow: "Account",
+    title: "We fixed your Instagram",
+    body: [`Your HustleQ account is now linked to @${esc(v.handle)}. Log in and Duke will pick up from there.`],
+    button: { label: "Open HustleQ", url: v.url },
+  });

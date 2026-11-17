@@ -23,6 +23,7 @@ export type IgPost = {
   likes: number | null;
   comments: number | null;
   views: number | null; // reels only
+  thumbnailUrl: string | null; // Instagram CDN link, expires after a few days
 };
 
 export type IgProfileBundle = { profile: IgProfile; posts: IgPost[]; fetchedAt: string; source: "fake" | "demo" | "api" };

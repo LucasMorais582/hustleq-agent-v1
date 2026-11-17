@@ -36,8 +36,13 @@ router.post("/logout", requireUser, async (req, res) => {
 
 router.get("/me", requireUser, async (req, res) => {
   const me = currentUser(req);
-  const user = await db.user.findUniqueOrThrow({ where: { id: me.id }, include: { business: true } });
-  res.json({ user: publicUser(user), business: user.business });
+  const user = await db.user.findUniqueOrThrow({ where: { id: me.id }, include: { business: true, onboarding: true } });
+  res.json({
+    user: publicUser(user),
+    business: user.business ? { businessName: user.business.businessName, completedAt: user.business.completedAt } : null,
+    // The app sends the owner to /onboarding until this is "done".
+    onboarding: { status: user.onboarding?.status ?? "active", step: user.onboarding?.step ?? 1 },
+  });
 });
 
 // ---------- Forgot password (1.4) and set a new one (1.5) ----------

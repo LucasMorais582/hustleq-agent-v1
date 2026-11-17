@@ -39,6 +39,7 @@ export const demoSource: SocialDataSource = {
           likes: post.likesCount ?? null,
           comments: post.commentsCount ?? null,
           views: null, // the demo endpoint does not return Reels views
+          thumbnailUrl: post.displayUrl ?? null,
         })),
         fetchedAt: new Date().toISOString(),
         source: "demo",

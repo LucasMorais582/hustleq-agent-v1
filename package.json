@@ -12,7 +12,8 @@
     "mvp:migrate": "prisma migrate deploy --schema prisma/mvp/schema.prisma",
     "mvp:seed": "tsx src/mvp/scripts/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:duke": "tsx evals/duke/run.ts"
   },
   "keywords": [],
   "author": "",

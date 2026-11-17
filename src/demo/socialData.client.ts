@@ -32,6 +32,7 @@ type ProfileResponse = {
       type?: string | null;
       caption?: string | null;
       url?: string | null;
+      displayUrl?: string | null;
       likesCount?: number | null;
       commentsCount?: number | null;
       publishedAt?: string | null;
