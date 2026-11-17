@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError, notFound } from "../http/errors.js";
@@ -28,7 +29,7 @@ campaignsRouter.get("/:id", async (req, res) => {
   res.json(c);
 });
 
-campaignsRouter.post("/:id/save", async (req, res) => {
+campaignsRouter.post("/:id/save", requireActivePlan, async (req, res) => {
   const { id } = idParam.parse(req.params);
   const c = await saveCampaign(currentUser(req).id, id);
   if (!c) throw notFound("Campaign not found.");

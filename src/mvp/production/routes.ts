@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { db } from "../db.js";
 import { currentUser, requireUser } from "../auth/middleware.js";
@@ -53,7 +54,7 @@ productionRouter.get("/:id/shot-list", async (req, res) => {
 });
 
 // Builds it the first time (or again with {rebuild:true}); the app polls the GET while it's pending.
-productionRouter.post("/:id/shot-list", async (req, res) => {
+productionRouter.post("/:id/shot-list", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   const { rebuild } = z.object({ rebuild: z.boolean().optional() }).parse(req.body ?? {});

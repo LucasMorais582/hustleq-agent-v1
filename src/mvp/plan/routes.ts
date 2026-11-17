@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { db } from "../db.js";
 import { currentUser, requireUser } from "../auth/middleware.js";
@@ -90,7 +91,7 @@ const saveBody = z.object({
   reminders: z.boolean(),
 });
 
-weeksRouter.post("/:id/save", async (req, res) => {
+weeksRouter.post("/:id/save", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   try {

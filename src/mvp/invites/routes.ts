@@ -67,8 +67,11 @@ router.post("/:token/accept", async (req, res) => {
         instagramProfileId: invite.instagramProfileId,
         termsAcceptedAt: new Date(),
         termsVersion: process.env.TERMS_VERSION || "draft-2026-11",
+        billingExempt: invite.billingExempt,
       },
     });
+    // The plan starts in Stripe Checkout right after this (First Access: first month free).
+    if (!invite.billingExempt) await tx.subscription.create({ data: { userId: created.id, firstAccess: invite.firstAccess } });
     await tx.businessProfile.create({ data: { userId: created.id, businessName: invite.businessName } });
     await tx.onboardingState.create({ data: { userId: created.id } });
     // Accepting stops the reminders: the daily job only looks at pending invites.

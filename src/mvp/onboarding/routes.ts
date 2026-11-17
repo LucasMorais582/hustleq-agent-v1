@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError } from "../http/errors.js";
@@ -16,7 +17,7 @@ const replyBody = z.object({
   text: z.string().max(600).optional(),
 });
 
-router.post("/reply", async (req, res) => {
+router.post("/reply", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   try {
     const result = await replyOnboarding(me.id, replyBody.parse(req.body));

@@ -9,7 +9,7 @@ import { addDays, dayInTz, daysBetween, shortDate, zonedTime } from "../lib/time
 export const INVITE_TZ = "America/New_York";
 export const INVITE_DAYS = 7;
 
-type InviteRow = { id: string; email: string; businessName: string; instagramHandle: string; createdAt: Date; expiresAt: Date };
+type InviteRow = { id: string; email: string; businessName: string; instagramHandle: string; createdAt: Date; expiresAt: Date; firstAccess?: boolean };
 
 export function inviteDay(invite: { createdAt: Date }, now = new Date()) {
   return daysBetween(dayInTz(invite.createdAt, INVITE_TZ), dayInTz(now, INVITE_TZ)) + 1;
@@ -31,7 +31,7 @@ export function inviteToken(inviteId: string) {
 export const inviteUrl = (inviteId: string) => appUrl(`/invite/${inviteToken(inviteId)}`);
 
 function vars(invite: InviteRow, url: string) {
-  return { businessName: invite.businessName, handle: invite.instagramHandle, url, heldUntil: shortDate(invite.expiresAt, INVITE_TZ) };
+  return { businessName: invite.businessName, handle: invite.instagramHandle, url, heldUntil: shortDate(invite.expiresAt, INVITE_TZ), firstAccess: Boolean(invite.firstAccess) };
 }
 
 export async function sendInviteEmail(invite: InviteRow) {

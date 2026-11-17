@@ -2,6 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db } from "../db.js";
+import { planSummary } from "../billing/service.js";
 import { AppError } from "../http/errors.js";
 import { randomBytes } from "node:crypto";
 import { appUrl, sendEmail } from "../email/send.js";
@@ -42,6 +43,7 @@ router.get("/me", requireUser, async (req, res) => {
     business: user.business ? { businessName: user.business.businessName, completedAt: user.business.completedAt } : null,
     // The app sends the owner to /onboarding until this is "done".
     onboarding: { status: user.onboarding?.status ?? "active", step: user.onboarding?.step ?? 1 },
+    plan: await planSummary(user.id),
   });
 });
 

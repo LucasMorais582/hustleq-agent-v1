@@ -11,6 +11,7 @@ import { postsRouter } from "./posts/routes.js";
 import { calendarRouter, homeRouter } from "./home/routes.js";
 import { campaignsRouter, datesRouter } from "./campaigns/routes.js";
 import { notesRouter } from "./notes/routes.js";
+import { billingRouter, billingWebhook } from "./billing/routes.js";
 import { exportsRouter, filesRouter, productionRouter, sharedRouter, shotItemsRouter } from "./production/routes.js";
 import { errorHandler } from "./http/errors.js";
 
@@ -20,6 +21,7 @@ export function mvpRouter() {
   const router = Router();
 
   router.use(cors({ origin: origins, credentials: false }));
+  router.post("/billing/webhook", ...billingWebhook); // raw body, before the JSON parser
   router.use(express.json({ limit: "200kb" }));
 
   router.use("/auth", authRoutes);
@@ -36,6 +38,7 @@ export function mvpRouter() {
   router.use("/campaigns", campaignsRouter);
   router.use("/commercial-dates", datesRouter);
   router.use("/notes", notesRouter);
+  router.use("/billing", billingRouter);
   router.use("/shot-list", shotItemsRouter);
   router.use("/exports", exportsRouter);
   router.use("/shared", sharedRouter);

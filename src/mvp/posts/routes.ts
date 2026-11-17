@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError, notFound } from "../http/errors.js";
@@ -63,7 +64,7 @@ postsRouter.post("/:id/status", async (req, res) => {
 });
 
 // "Regenerate" on Creative direction or What to produce. Counts toward the daily limit.
-postsRouter.post("/:id/regenerate", async (req, res) => {
+postsRouter.post("/:id/regenerate", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   const { section } = z.object({ section: z.enum(["creativeDirection", "whatToProduce"]) }).parse(req.body);
@@ -110,7 +111,7 @@ postsRouter.put("/:id/media/order", async (req, res) => {
   res.json(await run(() => reorderMedia(me.id, id, ids)));
 });
 
-postsRouter.post("/:id/validate", async (req, res) => {
+postsRouter.post("/:id/validate", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   res.json(await run(() => validatePost(me.id, me.timezone, id)));

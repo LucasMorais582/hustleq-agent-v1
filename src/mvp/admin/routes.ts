@@ -48,6 +48,8 @@ const inviteBody = z.object({
   email: z.string().trim().toLowerCase().email(),
   businessName: z.string().trim().min(1).max(120),
   handle: handleSchema,
+  firstAccess: z.boolean().default(false),
+  billingExempt: z.boolean().default(false), // "Managed by HustleQ team" (FPP accounts)
 });
 
 router.post("/invites", async (req, res) => {
@@ -77,6 +79,8 @@ router.post("/invites", async (req, res) => {
       createdAt,
       expiresAt: expiresAtFor(createdAt),
       createdById: me.id,
+      firstAccess: body.firstAccess,
+      billingExempt: body.billingExempt,
     },
   });
   const email = await sendInviteEmail(invite);
@@ -155,9 +159,10 @@ router.post("/account-requests/:id/resolve", async (req, res) => {
   res.json({ ok: true });
 });
 
-function present(i: { id: string; email: string; businessName: string; instagramHandle: string; status: string; createdAt: Date; expiresAt: Date; acceptedAt?: Date | null; lastReminderAt?: Date | null }) {
+function present(i: { id: string; email: string; businessName: string; instagramHandle: string; status: string; createdAt: Date; expiresAt: Date; acceptedAt?: Date | null; lastReminderAt?: Date | null; firstAccess?: boolean; billingExempt?: boolean }) {
   return {
     id: i.id, email: i.email, businessName: i.businessName, instagramHandle: i.instagramHandle, status: i.status,
+    firstAccess: Boolean(i.firstAccess), billingExempt: Boolean(i.billingExempt),
     createdAt: i.createdAt, expiresAt: i.expiresAt, acceptedAt: i.acceptedAt ?? null, lastReminderAt: i.lastReminderAt ?? null,
   };
 }

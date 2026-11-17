@@ -34,6 +34,7 @@ model User {
   instagramHandle    String?
   termsAcceptedAt    DateTime?
   termsVersion       String?
+  billingExempt      Boolean   @default(false)  // accounts the HustleQ team manages (FPP): always active, no Stripe
   remindersOn        Boolean   @default(true)   // email on post days (Account · Reminders)
   reminderTime       String    @default("09:00") // when the reminder goes out, owner's timezone
   createdAt          DateTime  @default(now())
@@ -93,6 +94,8 @@ model Invite {
   businessName       String
   instagramHandle    String
   instagramProfileId String?
+  firstAccess        Boolean      @default(false) // Duke First Access: first month free
+  billingExempt      Boolean      @default(false) // managed by the HustleQ team: no Stripe
   tokenHash          String       @unique
   status             InviteStatus @default(pending)
   expiresAt          DateTime
@@ -620,8 +623,14 @@ model Subscription {
   userId               String    @unique
   stripeCustomerId     String?   @unique
   stripeSubscriptionId String?   @unique
-  status               String    @default("none") // none | active | past_due | canceled | inactive
+  status               String    @default("none") // Stripe's status: none | trialing | active | past_due | canceled | unpaid | incomplete ...
   currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  cancelReason         String?
+  firstAccess          Boolean   @default(false)
+  graceUntil           DateTime? // payment failed: still active until this moment (3 days)
+  endedAt              DateTime?
+  syncedAt             DateTime?
   updatedAt            DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -644,6 +653,8 @@ model LimitRenewal {
   userId          String
   kind            String
   stripePaymentId String?
+  stripeSessionId String?  @unique // one renewal per Checkout session
+  amountCents     Int      @default(2000)
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

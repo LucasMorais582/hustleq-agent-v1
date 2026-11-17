@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireActivePlan } from "../billing/service.js";
 import { z } from "zod";
 import { emptyDayOpening } from "../home/service.js";
 import { campaignOpening, noteOpening } from "./openings.js";
@@ -113,7 +114,7 @@ router.delete("/:id", async (req, res) => {
 // text {delta} · card {card} · replies {options} · done · error {code, message}.
 const activeTurns = new Set<string>();
 
-router.post("/:id/messages", async (req, res) => {
+router.post("/:id/messages", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   const { text } = z.object({ text: z.string().trim().min(1).max(4000) }).parse(req.body);

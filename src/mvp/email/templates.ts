@@ -32,7 +32,7 @@ function text(b: Block) {
 export type Email = { template: string; subject: string; html: string; text: string };
 const build = (template: string, subject: string, b: Block): Email => ({ template, subject, html: layout(b), text: text(b) });
 
-type InviteVars = { businessName: string; handle: string; url: string; heldUntil: string };
+type InviteVars = { businessName: string; handle: string; url: string; heldUntil: string; firstAccess?: boolean };
 const who = (v: { businessName: string; handle: string }) => `Invite for ${esc(v.businessName)} · @${esc(v.handle)}`;
 
 export const inviteEmail = (v: InviteVars) =>
@@ -44,7 +44,7 @@ export const inviteEmail = (v: InviteVars) =>
       `<b>Held until ${esc(v.heldUntil)}.</b> After that, the seat goes to the next business on the list.`,
     ],
     button: { label: "Accept invite", url: v.url },
-    notes: ["Duke First Access: your first month is free.", "One reminder a day until you accept or the invite expires."],
+    notes: [...(v.firstAccess ? ["Duke First Access: your first month is free."] : []), "One reminder a day until you accept or the invite expires."],
   });
 
 export const inviteReminderEmail = (v: InviteVars & { daysLeft: number }) =>
@@ -116,3 +116,32 @@ export const postReminderEmail = (v: { timeLabel: string; formatLabel: string; t
     notes: [`<a href="${esc(v.settingsUrl)}" style="color:${C.muted}">Turn off reminders in Account settings.</a>`],
   });
 };
+
+// EM-5 · payment failed
+export const paymentFailedEmail = (v: { until: string; url: string }) =>
+  build("payment_failed", "Your HustleQ payment didn’t go through", {
+    eyebrow: "Plan · US$ 20/month",
+    title: "We couldn’t charge your card",
+    body: [`Duke will keep planning until <b>${esc(v.until)}</b>. After that, your account becomes view-only until the payment works.`],
+    button: { label: "Update card", url: v.url },
+    notes: ["Questions? Reply to this email."],
+  });
+
+// EM-6 · plan cancelled
+export const planCancelledEmail = (v: { endsOn: string; url: string }) =>
+  build("plan_cancelled", "Your plan is cancelled", {
+    eyebrow: "Plan · US$ 20/month",
+    title: `Your plan ends on ${esc(v.endsOn)}`,
+    body: ["Everything works until then. After that, you can still see your posts and calendar. No more charges."],
+    button: { label: "Resume plan", url: v.url },
+    notes: [`Changed your mind? Resume any time before ${esc(v.endsOn)}.`],
+  });
+
+// EM-7 · limits renewed (receipt, no button)
+export const limitsRenewedEmail = (v: { resetsOn: string }) =>
+  build("limits_renewed", "Your limits are back to zero", {
+    eyebrow: "Receipt",
+    title: "Limits renewed",
+    body: ["Explore searches and post validations are back to zero. Charged US$ 20 on Stripe.", "What you didn’t use before renewing doesn’t carry over."],
+    notes: [`Your next monthly reset is ${esc(v.resetsOn)}.`],
+  });
