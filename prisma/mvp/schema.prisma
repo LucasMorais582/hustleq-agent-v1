@@ -1,0 +1,573 @@
+// HustleQ MVP data model (branch mvp-v1).
+// Lives in the Postgres schema "mvp" (see MVP_DATABASE_URL); the demo and the beta keep "public".
+// Instagram data is not stored here: it belongs to the Social Data API. We keep only the profile id
+// and the link planned post -> published post.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../src/generated/mvp"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MVP_DATABASE_URL")
+}
+
+// ---------- Account and access ----------
+
+enum Role {
+  user
+  admin
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String
+  role               Role      @default(user)
+  timezone           String    @default("America/New_York")
+  instagramProfileId String?   @unique
+  instagramHandle    String?
+  termsAcceptedAt    DateTime?
+  termsVersion       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions        Session[]
+  resetTokens     PasswordResetToken[]
+  business        BusinessProfile?
+  onboarding      OnboardingState?
+  conversations   Conversation[]
+  aiUsage         AiUsage[]
+  strategies      Strategy[]
+  weeks           Week[]
+  posts           Post[]
+  campaigns       Campaign[]
+  userDates       UserCommercialDate[]
+  notes           Note[]
+  savedPosts      SavedPost[]
+  watchedAccounts WatchedAccount[]
+  milestones      Milestone[]
+  monthlyReviews  MonthlyReview[]
+  suggestions     Suggestion[]
+  subscription    Subscription?
+  usage           Usage[]
+  limitRenewals   LimitRenewal[]
+  refreshUsage    RefreshUsage[]
+  credits         Credit[]
+  shotLists       ShotList[]
+  exports         Export[]
+}
+
+model Session {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  expired
+  revoked
+}
+
+model Invite {
+  id                 String       @id @default(uuid())
+  email              String
+  businessName       String
+  instagramHandle    String
+  instagramProfileId String?
+  tokenHash          String       @unique
+  status             InviteStatus @default(pending)
+  expiresAt          DateTime
+  lastReminderAt     DateTime?
+  createdById        String
+  acceptedUserId     String?
+  createdAt          DateTime     @default(now())
+
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  adminId      String
+  action       String
+  targetUserId String?
+  detail       Json?
+  createdAt    DateTime @default(now())
+
+  @@index([targetUserId])
+}
+
+// ---------- Business ----------
+
+model BusinessProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  businessName   String
+  whatYouSell    String?
+  city           String?
+  idealCustomer  String?
+  goals          String?
+  toneOfVoice    String?
+  differentials  String?
+  doNotPost      String?
+  postingCadence String?
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OnboardingState {
+  userId      String    @id
+  step        Int       @default(1)
+  data        Json?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Duke ----------
+
+model Conversation {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String?
+  pinned     Boolean  @default(false)
+  objectType String?  // week | strategy | campaign | note | onboarding
+  objectId   String?
+  summary    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  toolCalls ToolCall[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String   // user | assistant
+  // Content blocks exactly as the Claude API returned them (thinking blocks included):
+  // the history must go back append-only, or preserved thinking breaks.
+  content        Json
+  // What the app renders: text plus cards.
+  display        Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model ToolCall {
+  id             String   @id @default(uuid())
+  conversationId String
+  name           String
+  input          Json
+  output         Json?
+  status         String   // ok | blocked | error
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model AiUsage {
+  id               String   @id @default(uuid())
+  userId           String?
+  feature          String   // chat | week_skeleton | post_details | ...
+  model            String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  costUsd          Decimal  @db.Decimal(10, 6)
+  durationMs       Int?
+  createdAt        DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+// ---------- Plan ----------
+
+model Strategy {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  summary   String?
+  goals     Json?
+  status    String   @default("active") // draft | active | archived
+  startsOn  DateTime? @db.Date
+  endsOn    DateTime? @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pillars Pillar[]
+  weeks   Week[]
+
+  @@index([userId])
+}
+
+model Pillar {
+  id          String  @id @default(uuid())
+  strategyId  String
+  name        String
+  description String?
+  share       Int?    // % of posts
+  position    Int     @default(0)
+
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  posts    Post[]
+}
+
+model Week {
+  id         String   @id @default(uuid())
+  userId     String
+  strategyId String?
+  startsOn   DateTime @db.Date
+  status     String   @default("draft") // draft | saved
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  posts    Post[]
+  shotList ShotList?
+
+  @@unique([userId, startsOn])
+}
+
+enum PostStatus {
+  draft
+  scheduled
+  posted
+  cancelled
+}
+
+model Post {
+  id                 String     @id @default(uuid())
+  userId             String
+  weekId             String?
+  pillarId           String?
+  campaignId         String?
+  status             PostStatus @default(draft)
+  scheduledAt        DateTime?
+  format             String?    // reel | carousel | feed | story
+  title              String?
+  hook               String?
+  caption            String?
+  creativeDirection  Json?
+  productionGuidance Json?
+  detailsStatus      String     @default("pending") // pending | ready | failed
+  reminderEmail      Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  week        Week?            @relation(fields: [weekId], references: [id], onDelete: SetNull)
+  pillar      Pillar?          @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  campaign    Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  media       PostMedia[]
+  validations PostValidation[]
+  publication PostPublication?
+
+  @@index([userId, scheduledAt])
+}
+
+model PostMedia {
+  id          String   @id @default(uuid())
+  postId      String
+  storagePath String
+  mimeType    String
+  sizeBytes   Int
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model PostValidation {
+  id        String   @id @default(uuid())
+  postId    String
+  result    Json
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model PostPublication {
+  id              String   @id @default(uuid())
+  postId          String   @unique
+  instagramPostId String   // id in the Social Data API
+  confirmedAt     DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Production ----------
+
+model ShotList {
+  id        String   @id @default(uuid())
+  userId    String
+  weekId    String   @unique
+  createdAt DateTime @default(now())
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  week  Week           @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  items ShotListItem[]
+}
+
+model ShotListItem {
+  id         String  @id @default(uuid())
+  shotListId String
+  postId     String?
+  text       String
+  done       Boolean @default(false)
+  position   Int     @default(0)
+
+  shotList ShotList @relation(fields: [shotListId], references: [id], onDelete: Cascade)
+}
+
+model Export {
+  id        String   @id @default(uuid())
+  userId    String
+  linkId    String   @unique
+  kind      String   // week | strategy | campaign
+  objectId  String
+  include   Json?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Calendar ----------
+
+model Campaign {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  goal      String?
+  startsOn  DateTime @db.Date
+  endsOn    DateTime @db.Date
+  color     String
+  status    String   @default("draft") // draft | active | ended
+  dateId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@index([userId])
+}
+
+model CommercialDate {
+  id      String   @id @default(uuid())
+  name    String
+  date    DateTime @db.Date
+  country String   @default("US")
+  niches  String[]
+
+  @@unique([name, date])
+}
+
+model UserCommercialDate {
+  id               String    @id @default(uuid())
+  userId           String
+  commercialDateId String?
+  name             String?
+  date             DateTime? @db.Date
+  notThisYear      Boolean   @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------- Ideas ----------
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  references NoteReference[]
+
+  @@index([userId])
+}
+
+model NoteReference {
+  id              String  @id @default(uuid())
+  noteId          String
+  instagramPostId String?
+  url             String?
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+}
+
+model SavedPost {
+  id              String   @id @default(uuid())
+  userId          String
+  instagramPostId String
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instagramPostId])
+}
+
+// ---------- Explore ----------
+
+model WatchedAccount {
+  id                 String    @id @default(uuid())
+  userId             String
+  instagramProfileId String
+  handle             String
+  label              String    // competitor | inspiration
+  minUntil           DateTime? // cannot be removed before this date
+  createdAt          DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instagramProfileId])
+}
+
+model ExploreCache {
+  id        String   @id @default(uuid())
+  key       String   @unique // niche|city or term
+  data      Json
+  fetchedAt DateTime @default(now())
+}
+
+// ---------- Review ----------
+
+model Milestone {
+  id        String   @id @default(uuid())
+  userId    String
+  kind      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MonthlyReview {
+  id          String    @id @default(uuid())
+  userId      String
+  month       DateTime  @db.Date
+  analysis    Json?     // prepared in batch on day 1
+  step        Int       @default(0)
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+}
+
+model Suggestion {
+  id          String    @id @default(uuid())
+  userId      String
+  kind        String    // campaign | empty_day | monthly_review | strategy
+  payload     Json?
+  status      String    @default("open") // open | shown | accepted | dismissed
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+// ---------- Billing and limits ----------
+
+model Subscription {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  status               String    @default("none") // none | active | past_due | canceled | inactive
+  currentPeriodEnd     DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Usage {
+  id          String   @id @default(uuid())
+  userId      String
+  kind        String   // heavy_generation | validation | search | watch_slot
+  periodStart DateTime @db.Date
+  count       Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, periodStart])
+}
+
+model LimitRenewal {
+  id              String   @id @default(uuid())
+  userId          String
+  kind            String
+  stripePaymentId String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshUsage {
+  id                 String   @id @default(uuid())
+  userId             String
+  instagramProfileId String
+  day                DateTime @db.Date // in the account's timezone
+  count              Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instagramProfileId, day])
+}
+
+model Credit {
+  id          String    @id @default(uuid())
+  userId      String
+  amountCents Int
+  source      String    // first_access
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
