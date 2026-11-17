@@ -4,6 +4,7 @@ import { JOB_PREPARE, prepareOnboarding } from "../onboarding/service.js";
 import { writePostDetails } from "../plan/details.js";
 import { JOB_SHOT_LIST, writeShotList } from "../production/shotList.js";
 import { runReminders } from "../posts/reminders.js";
+import { db } from "../db.js";
 import { defineJob, defineSchedule } from "./queue.js";
 
 // Registry of every job.
@@ -15,6 +16,7 @@ export const JOBS = {
   postDetails: "post-details", // full details of one post (Claude)
   shotList: JOB_SHOT_LIST, // what to film for a week (Claude)
   postReminders: "post-reminders", // 6.3 reminder emails, every 15 minutes
+  instagramDaily: "instagram-daily", // own profile + recent posts for every owner, once a day (Home numbers, 6.4)
 } as const;
 
 export let lastPing: { at: Date; data: unknown } | null = null;
@@ -47,3 +49,20 @@ defineJob(JOBS.postReminders, async () => {
   if (r.sent) console.log("[jobs] post reminders", r);
 });
 defineSchedule(JOBS.postReminders, "*/15 * * * *", "UTC");
+
+// Once a day: each owner's profile and last posts. A failure keeps yesterday's data and the Home
+// shows E.6 ("Your numbers are from ..."); the next run tries again.
+defineJob(JOBS.instagramDaily, async () => {
+  const users = await db.user.findMany({ where: { instagramHandle: { not: null }, onboarding: { status: "done" } }, select: { instagramHandle: true } });
+  const handles = [...new Set(users.map((u) => u.instagramHandle!))];
+  let ok = 0;
+  for (const handle of handles) {
+    try {
+      if (await syncInstagram(handle, { maxAgeMs: 20 * 3600_000 })) ok += 1;
+    } catch (error) {
+      console.error("[jobs] instagram daily failed", handle, error);
+    }
+  }
+  console.log("[jobs] instagram daily", { handles: handles.length, ok });
+});
+defineSchedule(JOBS.instagramDaily, "0 6 * * *", "America/New_York");

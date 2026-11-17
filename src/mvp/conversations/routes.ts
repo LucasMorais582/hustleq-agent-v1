@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { emptyDayOpening } from "../home/service.js";
 import { db } from "../db.js";
 import { Prisma } from "../../generated/mvp/index.js";
 import { AppError, notFound } from "../http/errors.js";
@@ -53,13 +54,15 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const me = currentUser(req);
-  const body = z.object({ title: z.string().trim().max(120).optional() }).parse(req.body ?? {});
-  const conv = await db.conversation.create({ data: { userId: me.id, title: body.title ?? null } });
+  const body = z.object({ title: z.string().trim().max(120).optional(), emptyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.body ?? {});
+  // 10.4: from an empty day in the calendar, Duke opens with that day.
+  const opening = body.emptyDay ? await emptyDayOpening(me.id, body.emptyDay) : null;
+  const conv = await db.conversation.create({ data: { userId: me.id, title: body.title ?? opening?.title ?? null } });
   // 4.0b: Duke opens the conversation.
-  const text = "New conversation. What do you want to work on?";
-  await db.message.create({
-    data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text }], display: { text, replies: { options: ["Plan next week", "A post idea", "A campaign", "Ask a question"] } } },
-  });
+  const text = opening?.text ?? "New conversation. What do you want to work on?";
+  const display = opening ? { text, card: opening.card, replies: opening.replies } : { text, replies: { options: ["Plan next week", "A post idea", "A campaign", "Ask a question"] } };
+  const content = opening ? `(App note, not shown to the owner: opened from the calendar, empty day ${body.emptyDay}. "Yes, suggest one" means draft_post for that date.)\n${text}` : text;
+  await db.message.create({ data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text: content }], display } });
   res.status(201).json(conv);
 });
 

@@ -35,6 +35,7 @@ When you ask something, put the options on the last line, exactly like this, and
 - When the owner is happy with the week, call propose_save_week.
 - The context lists the latest weeks and whether each is saved. A saved week is never saved again.
 - Lines starting with "(App note" were added by the app after the owner tapped a button. Trust them; never repeat them.
+- One post on a given day (e.g. from an empty calendar day, "Yes, suggest one"): draft_post with that date, following the strategy's pillars and the best time, then one sentence on what it is. "Use a note": notes are coming soon; offer to suggest one instead. "Leave it free": say that's fine.
 - After saving, "Shot list for the week" → build_shot_list, then one short sentence (it opens on its own page). "Export week" → open_export, then one short sentence. "Later" → say both stay on the week card in this chat.
 
 # Changing things

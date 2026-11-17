@@ -6,7 +6,7 @@ import { cachedInstagram, formatStats, syncInstagram } from "../instagram/own.js
 import { DailyCapReached, refundHeavyGeneration, useHeavyGeneration } from "../plan/limits.js";
 import { DAYS, postingPace, weekStartFor } from "../plan/timing.js";
 import {
-  BASE_PILLARS, createDraftStrategy, createDraftWeek, FORMATS, getStrategy, planningContext, PlanInputError, presentStrategy, revisePost,
+  BASE_PILLARS, createDraftPost, createDraftStrategy, createDraftWeek, FORMATS, getStrategy, planningContext, PlanInputError, presentStrategy, revisePost,
 } from "../plan/service.js";
 import { requestShotList } from "../production/shotList.js";
 
@@ -333,6 +333,33 @@ const TOOLS: ToolDef[] = [
       if (!week) return { error: "No saved week yet. Offer to plan one." };
       ctx.emitCard({ type: "export", weekId: week.id });
       return { shown_to_owner: true, weekId: week.id };
+    },
+  },
+  {
+    tool: {
+      name: "draft_post",
+      description: "Add one post on a specific day, as a Draft (for example from an empty calendar day). Full details are written in the background; the owner opens the post to schedule it. Use the best time unless there's a reason not to. Counts toward the daily limit.",
+      input_schema: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD" },
+          time: { type: "string", description: "HH:MM, 24 h, owner's timezone" },
+          format: { type: "string", enum: [...FORMATS] },
+          pillar: { type: "string", description: "Pillar name from the active strategy" },
+          title: { type: "string", description: "Concrete, specific to the business, under 70 characters" },
+          hook: { type: "string" },
+        },
+        required: ["date", "time", "format", "title"],
+        additionalProperties: false,
+      },
+    },
+    input: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: timeSchema, format: formatEnum, pillar: z.string().max(40).optional(), title: z.string().min(1).max(120), hook: z.string().max(300).optional() }),
+    async run(input, ctx) {
+      return heavy(ctx, async () => {
+        const post = await createDraftPost(ctx.userId, ctx.timezone, input);
+        ctx.emitCard({ type: "post", postId: post.id });
+        return { postId: post.id, status: "draft", note: "Card shown with Open post. It's a Draft until the owner schedules it on the post page." };
+      });
     },
   },
 ];

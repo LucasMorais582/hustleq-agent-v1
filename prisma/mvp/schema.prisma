@@ -362,6 +362,7 @@ model Post {
   reminderSentAt     DateTime?
   timeSuggested      Boolean    @default(true) // "· suggested" until the owner sets the time
   note               String?
+  dismissedMatches   String[]   // Instagram post ids the owner said aren't this post (6.4 "No, different post")
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 

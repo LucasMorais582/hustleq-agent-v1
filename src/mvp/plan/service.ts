@@ -232,6 +232,32 @@ export async function createDraftWeek(userId: string, tz: string, conversationId
 
 export type PostChanges = { day?: DayName | undefined; time?: string | undefined; format?: Format | undefined; pillar?: string | undefined; title?: string | undefined; hook?: string | undefined };
 
+// One post on a given day (10.4 "Yes, suggest one"). It joins that week's plan if there is one,
+// as a Draft: the owner schedules it from the post page.
+export async function createDraftPost(userId: string, tz: string, args: { date: string; time: string; format: Format; pillar?: string | undefined; title: string; hook?: string | undefined }) {
+  const weekStart = mondayOf(new Date(`${args.date}T12:00:00Z`), "UTC");
+  const strategy = await activeStrategy(userId, tz);
+  const week = await db.week.findFirst({ where: { userId, startsOn: new Date(`${weekStart}T00:00:00Z`) }, orderBy: [{ status: "desc" }, { updatedAt: "desc" }] });
+  const pillar = args.pillar && strategy ? strategy.pillars.find((p) => p.name.toLowerCase() === args.pillar!.toLowerCase()) : null;
+  const day = DAYS[(new Date(`${args.date}T12:00:00Z`).getUTCDay() + 6) % 7]!;
+  const post = await db.post.create({
+    data: {
+      userId,
+      weekId: week?.id ?? null,
+      pillarId: pillar?.id ?? null,
+      status: "draft",
+      format: args.format,
+      contentType: contentTypeOf(args.format),
+      title: args.title.slice(0, 120),
+      hook: args.hook?.slice(0, 300) ?? null,
+      scheduledAt: scheduledAt(weekStart, day, args.time, tz),
+      position: 99,
+    },
+  });
+  void queueDetails([post.id]).catch((e) => console.error("[plan] queue details", e));
+  return post;
+}
+
 export async function revisePost(userId: string, tz: string, postId: string, changes: PostChanges) {
   const post = await db.post.findFirst({ where: { id: postId, userId }, include: { week: { include: { strategy: { include: { pillars: true } } } } } });
   if (!post || !post.week) return null;

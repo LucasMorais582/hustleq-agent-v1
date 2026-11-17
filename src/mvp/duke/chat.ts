@@ -47,7 +47,7 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
       ? `Latest weeks: ${weeks.map((w) => `week starting ${w.startsOn.toISOString().slice(0, 10)} (id ${w.id}, ${w.status === "saved" ? "saved" : "draft, not saved"})`).join("; ")}.`
       : "No weeks planned yet.",
     // Remove lines from here as the features ship.
-    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). On each post's page (tap the post) the owner edits date, time, type, caption and hashtags, uploads photos or video, and taps \"Validate with Duke\" (30 a month) to have you check them. Campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
+    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). The Home shows today and this week; the Calendar shows day, week and month, and posts move there. On each post's page (tap the post) the owner edits date, time, type, caption and hashtags, uploads photos or video, and taps \"Validate with Duke\" (30 a month) to have you check them. Campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
   ];
   return lines.join("\n");
 }
@@ -62,6 +62,7 @@ const STATUS: Record<string, string> = {
   revise_week_post: "Changing the post…",
   build_shot_list: "Listing what to film…",
   open_export: "Opening export…",
+  draft_post: "Writing the post…",
 };
 
 // Earlier turns go back without thinking blocks: the system context can change between turns
