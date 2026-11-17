@@ -93,9 +93,11 @@ model Invite {
   lastReminderAt     DateTime?
   createdById        String
   acceptedUserId     String?
+  acceptedAt         DateTime?
   createdAt          DateTime     @default(now())
 
   @@index([email])
+  @@index([status, expiresAt])
 }
 
 model PasswordResetToken {
@@ -118,6 +120,22 @@ model AdminAuditLog {
   createdAt    DateTime @default(now())
 
   @@index([targetUserId])
+}
+
+// Every email the app sends (or would send, without a provider). Also stops duplicates:
+// one invite reminder per day, one "last day" email per invite.
+model EmailLog {
+  id         String   @id @default(uuid())
+  to         String
+  template   String   // invite | invite_reminder | invite_last_day | invite_expired | password_reset
+  subject    String
+  refId      String?  // invite id, user id...
+  status     String   // sent | logged | failed
+  providerId String?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@index([refId, template])
 }
 
 // ---------- Business ----------

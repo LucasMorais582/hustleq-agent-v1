@@ -6,3 +6,4 @@ build/
 !.env.example
 
 src/generated/
+scripts-e2e.tmp/

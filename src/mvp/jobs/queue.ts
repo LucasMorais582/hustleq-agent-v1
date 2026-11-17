@@ -6,6 +6,7 @@ import { PgBoss } from "pg-boss";
 export type JobHandler<T = unknown> = (data: T) => Promise<void>;
 
 const handlers = new Map<string, JobHandler<any>>();
+const schedules: { name: string; cron: string; tz: string }[] = [];
 let boss: PgBoss | null = null;
 
 function connectionString() {
@@ -21,6 +22,11 @@ function connectionString() {
 
 export function defineJob<T>(name: string, handler: JobHandler<T>) {
   handlers.set(name, handler);
+}
+
+// Runs `name` on a cron, in a timezone (pg-boss keeps one schedule per name, across instances).
+export function defineSchedule(name: string, cron: string, tz: string) {
+  schedules.push({ name, cron, tz });
 }
 
 export async function startQueue({ work = true } = {}) {
@@ -41,6 +47,9 @@ export async function startQueue({ work = true } = {}) {
         for (const job of jobs) await handler(job.data);
       });
     }
+  }
+  if (work) {
+    for (const s of schedules) await boss.schedule(s.name, s.cron, {}, { tz: s.tz });
   }
   return boss;
 }
