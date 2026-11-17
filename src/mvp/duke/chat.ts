@@ -4,6 +4,7 @@ import { callClaude, streamClaude, textOf } from "../ai/client.js";
 import { DUKE_INSTRUCTIONS } from "./instructions.js";
 import { RepliesFilter } from "./replies.js";
 import { DUKE_TOOLS, runTool } from "./tools.js";
+import { campaignSuggestion } from "../campaigns/service.js";
 import { activeStrategy } from "../plan/service.js";
 import { cachedInstagram } from "../instagram/own.js";
 import { bestTime, timeLabel, weekStartFor } from "../plan/timing.js";
@@ -35,6 +36,10 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
     user.instagramHandle ? cachedInstagram(user.instagramHandle) : null,
     db.week.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 3, select: { id: true, startsOn: true, status: true } }),
   ]);
+  const [campaigns, suggestion] = await Promise.all([
+    db.campaign.findMany({ where: { userId, status: "saved", endsOn: { gte: new Date() } }, orderBy: { startsOn: "asc" }, take: 5, select: { id: true, name: true, startsOn: true, endsOn: true } }),
+    campaignSuggestion(userId, tz),
+  ]);
   const best = bestTime(bundle?.posts ?? [], tz);
   const lines = [
     `Today is ${today} (${tz}). This week starts ${weekStartFor("this", tz)}, next week starts ${weekStartFor("next", tz)} (Mondays).`,
@@ -46,10 +51,14 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
     weeks.length
       ? `Latest weeks: ${weeks.map((w) => `week starting ${w.startsOn.toISOString().slice(0, 10)} (id ${w.id}, ${w.status === "saved" ? "saved" : "draft, not saved"})`).join("; ")}.`
       : "No weeks planned yet.",
+    campaigns.length
+      ? `Saved campaigns: ${campaigns.map((c) => `"${c.name}" (id ${c.id}, ${c.startsOn.toISOString().slice(0, 10)} to ${c.endsOn.toISOString().slice(0, 10)})`).join("; ")}.`
+      : "No saved campaigns.",
+    suggestion ? `Coming up: ${suggestion.name} on ${suggestion.date} (dateId ${suggestion.dateId}), no campaign yet. Bring it up once if it fits the conversation.` : "",
     // Remove lines from here as the features ship.
-    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). The Home shows today and this week; the Calendar shows day, week and month, and posts move there. On each post's page (tap the post) the owner edits date, time, type, caption and hashtags, uploads photos or video, and taps \"Validate with Duke\" (30 a month) to have you check them. Campaigns, notes, the calendar and Explore are coming soon: if asked, say so and offer what you can do now.",
+    "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). The Home shows today, this week and campaign suggestions; the Calendar shows day, week and month, and posts move there. On each post's page (tap the post) the owner edits date, time, type, caption and hashtags, uploads photos or video, and taps \"Validate with Duke\" (30 a month) to have you check them. Campaigns for commercial dates and notes work too. Explore, Analytics and the monthly review are coming soon: if asked, say so and offer what you can do now.",
   ];
-  return lines.join("\n");
+  return lines.filter(Boolean).join("\n");
 }
 
 const STATUS: Record<string, string> = {
@@ -63,6 +72,9 @@ const STATUS: Record<string, string> = {
   build_shot_list: "Listing what to film…",
   open_export: "Opening export…",
   draft_post: "Writing the post…",
+  draft_campaign: "Planning your campaign…",
+  save_note: "Saving the note…",
+  search_notes: "Reading your notes…",
 };
 
 // Earlier turns go back without thinking blocks: the system context can change between turns

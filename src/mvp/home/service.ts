@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { cachedInstagram } from "../instagram/own.js";
 import { addDays, dayInTz, zonedTime } from "../lib/time.js";
 import { activeStrategy, FORMAT_LABEL, type Format } from "../plan/service.js";
+import { campaignSuggestion } from "../campaigns/service.js";
 import { DAYS, mondayOf, timeLabel } from "../plan/timing.js";
 import { signedReadUrls } from "../posts/storage.js";
 import type { IgPost } from "../socialData/index.js";
@@ -22,7 +23,7 @@ type PostRow = Awaited<ReturnType<typeof postsBetween>>[number];
 async function postsBetween(userId: string, tz: string, from: string, to: string) {
   return db.post.findMany({
     where: { userId, scheduledAt: { gte: zonedTime(from, "00:00:00", tz), lt: zonedTime(addDays(to, 1), "00:00:00", tz) } },
-    include: { pillar: true, media: { select: { id: true } } },
+    include: { pillar: true, media: { select: { id: true } }, campaign: { select: { id: true, name: true, color: true, status: true } } },
     orderBy: [{ scheduledAt: "asc" }, { position: "asc" }],
   });
 }
@@ -41,7 +42,7 @@ function presentCalPost(p: PostRow, tz: string) {
     format: p.format,
     formatLabel: FORMAT_LABEL[(p.format ?? "feed") as Format] ?? p.format,
     pillar: p.pillar?.name ?? null,
-    campaign: null as null | { id: string; name: string; color: string }, // phase 5
+    campaign: p.campaign ? { id: p.campaign.id, name: p.campaign.name, color: p.campaign.color } : null,
     date,
     dayLabel: dayLabel(date),
     time,
@@ -200,6 +201,7 @@ export async function getHome(userId: string, which: "this" | "next") {
     numbers: which === "this" ? numbers(bundle) : null,
     stale: staleNotice(bundle, cacheRow?.fetchedAt ?? null, tz),
     match: which === "this" ? await findMatch(userId, tz, user.instagramHandle) : null,
+    suggestion: which === "this" ? await campaignSuggestion(userId, tz) : null,
   };
 }
 
@@ -252,7 +254,16 @@ export async function getCalendar(userId: string, from: string, to: string) {
     const end = addDays(w, 6);
     weeks.push({ weekStart: w, label: rangeLabel(w, end), plan: weekPlan(strategy, posts.filter((p) => p.date >= w && p.date <= end)) });
   }
-  return { today: dayInTz(new Date(), tz), from, to, posts, weeks, campaigns: [] as { id: string; name: string; color: string }[] };
+  const campaigns = await db.campaign.findMany({
+    where: { userId, status: "saved", startsOn: { lte: new Date(`${to}T00:00:00Z`) }, endsOn: { gte: new Date(`${from}T00:00:00Z`) } },
+    select: { id: true, name: true, color: true, startsOn: true, endsOn: true },
+  });
+  const commercial = await db.commercialDate.findMany({ where: { country: "US", date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } }, select: { name: true, date: true } });
+  return {
+    today: dayInTz(new Date(), tz), from, to, posts, weeks,
+    campaigns: campaigns.map((c) => ({ id: c.id, name: c.name, color: c.color, startsOn: c.startsOn.toISOString().slice(0, 10), endsOn: c.endsOn.toISOString().slice(0, 10), posts: posts.filter((p) => p.campaign?.id === c.id).length })),
+    dates: commercial.map((d) => ({ name: d.name, date: d.date.toISOString().slice(0, 10) })),
+  };
 }
 
 // 10.4 · tapping an empty day of an incomplete week opens Duke with this question.
@@ -273,5 +284,6 @@ export async function emptyDayOpening(userId: string, date: string) {
     card: { type: "notice", text: `From Calendar · ${shortDay} · ${plan.have} of ${plan.planned || plan.have} posts` },
     replies: { options: ["Yes, suggest one", "Use a note", "Leave it free"] },
     title: `Post for ${shortDay}`,
+    note: `opened from the calendar, empty day ${date}. "Yes, suggest one" means draft_post for that date. "Use a note" means search_notes, then draft_post with that noteId.`,
   };
 }

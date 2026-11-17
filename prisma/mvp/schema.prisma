@@ -467,8 +467,11 @@ model Campaign {
   startsOn  DateTime @db.Date
   endsOn    DateTime @db.Date
   color     String
-  status    String   @default("draft") // draft | active | ended
-  dateId    String?
+  status    String   @default("draft") // draft | saved (upcoming / active / ended come from the dates)
+  dateId    String?  // CommercialDate id, or UserCommercialDate id for the owner's own dates
+  strategyId     String?
+  objective      String?
+  conversationId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -484,6 +487,7 @@ model CommercialDate {
   date    DateTime @db.Date
   country String   @default("US")
   niches  String[]
+  tip     String?  // shown in 7.5 when there's no campaign yet, e.g. "Good for gift cards and pre-orders"
 
   @@unique([name, date])
 }
@@ -494,7 +498,11 @@ model UserCommercialDate {
   commercialDateId String?
   name             String?
   date             DateTime? @db.Date
-  notThisYear      Boolean   @default(false)
+  notThisYear      Boolean   @default(false) // on a CommercialDate row: "Not this year"
+  skippedYear      Int?      // the year "Not this year" applies to
+  repeats          Boolean   @default(false) // own date: every year
+  suggestCampaign  Boolean   @default(true)  // own date: Duke suggests a campaign 3 to 4 weeks before
+  createdAt        DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -506,7 +514,10 @@ model UserCommercialDate {
 model Note {
   id        String   @id @default(uuid())
   userId    String
+  title     String?
   text      String
+  source    String   @default("manual") // chat | post_idea | manual | explore
+  postId    String?  // the post it turned into
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -521,6 +532,10 @@ model NoteReference {
   noteId          String
   instagramPostId String?
   url             String?
+  kind            String   @default("own") // own (your post) | explore
+  label           String?  // "@bahiataste · your post"
+  thumbnailUrl    String?
+  createdAt       DateTime @default(now())
 
   note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
 }

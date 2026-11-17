@@ -9,6 +9,8 @@ import {
   BASE_PILLARS, createDraftPost, createDraftStrategy, createDraftWeek, FORMATS, getStrategy, planningContext, PlanInputError, presentStrategy, revisePost,
 } from "../plan/service.js";
 import { requestShotList } from "../production/shotList.js";
+import { createDraftCampaign, skipDate } from "../campaigns/service.js";
+import { createNote, listNotes } from "../notes/service.js";
 
 // Duke's tools. Order and wording are part of the cached prefix: keep them stable.
 // Tools read, or propose; nothing that changes data runs without the owner's tap.
@@ -265,7 +267,7 @@ const TOOLS: ToolDef[] = [
   {
     tool: {
       name: "revise_week_post",
-      description: "Change one post of a week the owner is reviewing (or already saved): day, time, format, pillar, title or hook. The card updates and new details are written if the content changed. Counts toward the daily limit.",
+      description: "Change one post of a week or campaign the owner is reviewing (or already saved): day, time, format, pillar, title or hook. The card updates and new details are written if the content changed. Counts toward the daily limit.",
       input_schema: {
         type: "object",
         properties: {
@@ -287,7 +289,9 @@ const TOOLS: ToolDef[] = [
         const { postId, ...changes } = input;
         const post = await revisePost(ctx.userId, ctx.timezone, postId, changes);
         if (!post) throw new PlanInputError("Post not found.");
-        ctx.emitCard({ type: "week", weekId: post.weekId });
+        if (post.campaignId) ctx.emitCard({ type: "campaign", campaignId: post.campaignId });
+        else if (post.weekId) ctx.emitCard({ type: "week", weekId: post.weekId });
+        else ctx.emitCard({ type: "post", postId: post.id });
         return { updated: true, postId };
       });
     },
@@ -348,18 +352,118 @@ const TOOLS: ToolDef[] = [
           pillar: { type: "string", description: "Pillar name from the active strategy" },
           title: { type: "string", description: "Concrete, specific to the business, under 70 characters" },
           hook: { type: "string" },
+          noteId: { type: "string", description: "When the post comes from a note (8.5)" },
+          campaignId: { type: "string", description: "When the post is part of a saved campaign" },
         },
         required: ["date", "time", "format", "title"],
         additionalProperties: false,
       },
     },
-    input: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: timeSchema, format: formatEnum, pillar: z.string().max(40).optional(), title: z.string().min(1).max(120), hook: z.string().max(300).optional() }),
+    input: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: timeSchema, format: formatEnum, pillar: z.string().max(40).optional(), title: z.string().min(1).max(120), hook: z.string().max(300).optional(), noteId: z.string().uuid().optional(), campaignId: z.string().uuid().optional() }),
     async run(input, ctx) {
+      if (input.campaignId && !(await db.campaign.findFirst({ where: { id: input.campaignId, userId: ctx.userId } }))) return { error: "Campaign not found." };
+      if (input.noteId && !(await db.note.findFirst({ where: { id: input.noteId, userId: ctx.userId } }))) return { error: "Note not found." };
       return heavy(ctx, async () => {
-        const post = await createDraftPost(ctx.userId, ctx.timezone, input);
+        const { noteId, campaignId, ...fields } = input;
+        const post = await createDraftPost(ctx.userId, ctx.timezone, fields);
+        if (campaignId) await db.post.update({ where: { id: post.id }, data: { campaignId } });
+        if (noteId) await db.note.update({ where: { id: noteId }, data: { postId: post.id } });
         ctx.emitCard({ type: "post", postId: post.id });
         return { postId: post.id, status: "draft", note: "Card shown with Open post. It's a Draft until the owner schedules it on the post page." };
       });
+    },
+  },
+  {
+    tool: {
+      name: "draft_campaign",
+      description: "Show a campaign plan as a card (7.2): name, objective, and its posts over the period (date, time, format, pillar, title). Spread the posts over the period; the posts build up to the date. The owner taps Save campaign. Full details are written in the background. Counts toward the daily limit.",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "e.g. 'Black Friday 2026'" },
+          dateId: { type: "string", description: "The commercial date it's for, when there is one" },
+          strategyId: { type: "string", description: "The strategy that guides it" },
+          objective: { type: "string", description: "In the owner's words; no numbers they didn't give" },
+          posts: {
+            type: "array", minItems: 1, maxItems: 30,
+            items: {
+              type: "object",
+              properties: {
+                date: { type: "string", description: "YYYY-MM-DD" },
+                time: { type: "string", description: "HH:MM, 24 h" },
+                format: { type: "string", enum: [...FORMATS] },
+                pillar: { type: "string" },
+                title: { type: "string" },
+                hook: { type: "string" },
+              },
+              required: ["date", "time", "format", "title"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["name", "posts"],
+        additionalProperties: false,
+      },
+    },
+    input: z.object({
+      name: z.string().min(1).max(80),
+      dateId: z.string().max(60).optional(),
+      strategyId: z.string().uuid().optional(),
+      objective: z.string().max(300).optional(),
+      posts: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: timeSchema, format: formatEnum, pillar: z.string().max(40).optional(), title: z.string().min(1).max(120), hook: z.string().max(300).optional() })).min(1).max(30),
+    }),
+    async run(input, ctx) {
+      if (input.strategyId && !(await getStrategy(ctx.userId, input.strategyId))) return { error: "Strategy not found." };
+      return heavy(ctx, async () => {
+        const c = await createDraftCampaign(ctx.userId, ctx.timezone, ctx.conversationId, input);
+        ctx.emitCard({ type: "campaign", campaignId: c.id });
+        return { campaignId: c.id, posts: c.posts.map((p) => ({ postId: p.id, title: p.title })), note: "Card shown with Save campaign and Refine. Not saved until the owner taps Save campaign." };
+      });
+    },
+  },
+  {
+    tool: {
+      name: "skip_commercial_date",
+      description: "The owner doesn't want a campaign for this commercial date this year (\"Not this year\"). Duke won't suggest it again until next year.",
+      input_schema: { type: "object", properties: { dateId: { type: "string" } }, required: ["dateId"], additionalProperties: false },
+    },
+    input: z.object({ dateId: z.string().min(1).max(60) }),
+    async run(input: { dateId: string }, ctx) {
+      return (await skipDate(ctx.userId, ctx.timezone, input.dateId)) ?? { error: "Date not found." };
+    },
+  },
+  {
+    tool: {
+      name: "save_note",
+      description: "Save a note for later (8.1, 8.2): when the owner says \"note this for later\", or taps Save as note on an idea. Use their words; add a short title.",
+      input_schema: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "3 to 6 words" },
+          text: { type: "string", description: "The idea, in the owner's words" },
+          source: { type: "string", enum: ["chat", "post_idea"] },
+        },
+        required: ["title", "text", "source"],
+        additionalProperties: false,
+      },
+    },
+    input: z.object({ title: z.string().min(1).max(80), text: z.string().min(1).max(4000), source: z.enum(["chat", "post_idea"]) }),
+    async run(input, ctx) {
+      const note = await createNote(ctx.userId, ctx.timezone, input);
+      ctx.emitCard({ type: "note", noteId: note.id });
+      return { saved: true, noteId: note.id };
+    },
+  },
+  {
+    tool: {
+      name: "search_notes",
+      description: "Read the owner's notes (newest first), optionally matching words. Use before turning a note into a post, or when the owner asks about an idea they saved.",
+      input_schema: { type: "object", properties: { query: { type: "string" } }, additionalProperties: false },
+    },
+    input: z.object({ query: z.string().max(80).optional() }),
+    async run(input: { query?: string }, ctx) {
+      const notes = await listNotes(ctx.userId, ctx.timezone, input.query);
+      return { notes: notes.slice(0, 10).map((n) => ({ noteId: n.id, title: n.title, text: n.text.slice(0, 400), turnedIntoPost: Boolean(n.postId) })) };
     },
   },
 ];

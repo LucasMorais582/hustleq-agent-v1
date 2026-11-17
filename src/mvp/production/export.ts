@@ -42,18 +42,22 @@ const sign = (payload: string) => createHmac("sha256", secret()).update(`export:
 export type FileKind = "pdf" | "csv" | "ics";
 
 // A path on this API (the app adds its API base URL).
-export function signedFilePath(weekId: string, kind: FileKind, inc: Include = DEFAULT_INCLUDE, ttlMs = 24 * 3600e3) {
+export type Scope = "week" | "campaign";
+const SCOPE_PATH: Record<Scope, string> = { week: "weeks", campaign: "campaigns" };
+const signed = (scope: Scope, id: string) => (scope === "week" ? id : `campaign:${id}`); // week links stay as they were
+
+export function signedFilePath(weekId: string, kind: FileKind, inc: Include = DEFAULT_INCLUDE, ttlMs = 24 * 3600e3, scope: Scope = "week") {
   const exp = Date.now() + ttlMs;
   const i = encodeInclude(inc);
-  const sig = sign(`${kind}:${weekId}:${i}:${exp}`);
-  return `/v1/files/weeks/${weekId}.${kind}?i=${i}&exp=${exp}&sig=${sig}`;
+  const sig = sign(`${kind}:${signed(scope, weekId)}:${i}:${exp}`);
+  return `/v1/files/${SCOPE_PATH[scope]}/${weekId}.${kind}?i=${i}&exp=${exp}&sig=${sig}`;
 }
 
-export function verifyFileUrl(weekId: string, kind: FileKind, q: { i?: unknown; exp?: unknown; sig?: unknown }): Include | null {
+export function verifyFileUrl(weekId: string, kind: FileKind, q: { i?: unknown; exp?: unknown; sig?: unknown }, scope: Scope = "week"): Include | null {
   const i = typeof q.i === "string" && /^[01]{5}$/.test(q.i) ? q.i : null;
   const exp = Number(q.exp);
   if (!i || !Number.isFinite(exp) || exp < Date.now() || typeof q.sig !== "string") return null;
-  const want = Buffer.from(sign(`${kind}:${weekId}:${i}:${exp}`));
+  const want = Buffer.from(sign(`${kind}:${signed(scope, weekId)}:${i}:${exp}`));
   const got = Buffer.from(q.sig);
   return want.length === got.length && timingSafeEqual(want, got) ? decodeInclude(i) : null;
 }
@@ -111,6 +115,41 @@ export async function weekExport(weekId: string, opts: { userId?: string; requir
 }
 export type WeekExport = NonNullable<Awaited<ReturnType<typeof weekExport>>>;
 
+// A saved campaign exports the same way as a week (7.3 "Export").
+export async function campaignExport(campaignId: string, opts: { userId?: string; requireSaved?: boolean } = {}): Promise<WeekExport | null> {
+  const c = await db.campaign.findFirst({
+    where: { id: campaignId, ...(opts.userId ? { userId: opts.userId } : {}) },
+    include: { user: { select: { timezone: true } }, posts: { where: { status: { not: "cancelled" } }, include: { pillar: true }, orderBy: [{ scheduledAt: "asc" }, { position: "asc" }] } },
+  });
+  if (!c) return null;
+  if (opts.requireSaved && c.status !== "saved") throw new ExportError("Save the campaign first, then export it.");
+  const tz = c.user.timezone;
+  const bp = await db.businessProfile.findUnique({ where: { userId: c.userId }, select: { businessName: true } });
+  const start = c.startsOn.toISOString().slice(0, 10);
+  const end = c.endsOn.toISOString().slice(0, 10);
+  return {
+    weekId: c.id,
+    userId: c.userId,
+    businessName: bp?.businessName ?? "Your business",
+    label: c.name,
+    rangeLabel: `${fmtDay(start)} to ${fmtDay(end)}`,
+    weekStart: start,
+    timezone: tz,
+    shotList: null,
+    posts: c.posts.map((p) => {
+      const slot = postSlot(p.scheduledAt, tz);
+      return {
+        id: p.id, date: slot.date, day: slot.day, time: slot.time, slotLabel: slot.label, scheduledAt: p.scheduledAt, format: p.format,
+        formatLabel: FORMAT_LABEL[(p.format ?? "feed") as Format] ?? p.format ?? "", pillar: p.pillar?.name ?? null, title: p.title ?? "", hook: p.hook, caption: p.caption,
+        captionParts: (p.captionParts ?? null) as CaptionParts | null, hashtags: p.hashtags, creativeDirection: (p.creativeDirection ?? null) as Record<string, string> | null,
+        whatToProduce: (p.productionGuidance ?? null) as Guidance | null,
+      };
+    }),
+  };
+}
+const loaders: Record<Scope, typeof campaignExport> = { week: weekExport, campaign: campaignExport };
+export const exportFor = (scope: Scope, id: string, opts: { userId?: string; requireSaved?: boolean } = {}) => loaders[scope](id, opts);
+
 // The view-only payload (5.10): only what the owner chose to include.
 export function presentShared(data: WeekExport, inc: Include) {
   return {
@@ -140,18 +179,18 @@ export function presentShared(data: WeekExport, inc: Include) {
 
 // ---------- Share link ----------
 
-export async function activeLink(userId: string, weekId: string) {
-  const e = await db.export.findFirst({ where: { userId, kind: "week", objectId: weekId, active: true }, orderBy: { createdAt: "desc" } });
+export async function activeLink(userId: string, weekId: string, scope: Scope = "week") {
+  const e = await db.export.findFirst({ where: { userId, kind: scope, objectId: weekId, active: true }, orderBy: { createdAt: "desc" } });
   return e ? { linkId: e.linkId, url: appUrl(`/s/${e.linkId}`), include: { ...DEFAULT_INCLUDE, ...(e.include as Partial<Include> | null) } } : null;
 }
 
-export async function createShareLink(userId: string, weekId: string, inc: Include) {
-  const data = await weekExport(weekId, { userId, requireSaved: true });
+export async function createShareLink(userId: string, weekId: string, inc: Include, scope: Scope = "week") {
+  const data = await exportFor(scope, weekId, { userId, requireSaved: true });
   if (!data) return null;
-  const current = await db.export.findFirst({ where: { userId, kind: "week", objectId: weekId, active: true } });
+  const current = await db.export.findFirst({ where: { userId, kind: scope, objectId: weekId, active: true } });
   const e = current
     ? await db.export.update({ where: { id: current.id }, data: { include: inc } })
-    : await db.export.create({ data: { userId, kind: "week", objectId: weekId, include: inc, linkId: randomBytes(9).toString("base64url") } });
+    : await db.export.create({ data: { userId, kind: scope, objectId: weekId, include: inc, linkId: randomBytes(9).toString("base64url") } });
   return { linkId: e.linkId, url: appUrl(`/s/${e.linkId}`), include: inc };
 }
 
@@ -162,8 +201,8 @@ export async function turnOffLink(userId: string, linkId: string) {
 
 export async function sharedByLink(linkId: string) {
   const e = await db.export.findUnique({ where: { linkId } });
-  if (!e || !e.active || e.kind !== "week") return null;
-  const data = await weekExport(e.objectId);
+  if (!e || !e.active || (e.kind !== "week" && e.kind !== "campaign")) return null;
+  const data = await exportFor(e.kind as Scope, e.objectId);
   if (!data) return null;
   return presentShared(data, { ...DEFAULT_INCLUDE, ...(e.include as Partial<Include> | null) });
 }

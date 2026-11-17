@@ -189,7 +189,7 @@ export async function planningContext(userId: string, tz: string, weekStart: str
   };
 }
 
-async function queueDetails(postIds: string[]) {
+export async function queueDetails(postIds: string[]) {
   for (const postId of postIds) {
     const queued = await enqueueSafe("post-details", { postId });
     if (!queued) await writePostDetails(postId);

@@ -5,7 +5,7 @@ import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError, notFound } from "../http/errors.js";
 import { getShotList, requestShotList, setShotDone } from "./shotList.js";
 import {
-  activeLink, createShareLink, DEFAULT_INCLUDE, ExportError, sharedByLink, signedFilePath, turnOffLink, verifyFileUrl, weekCsv, weekExport, weekIcs, weekPdf, type FileKind, type Include,
+  activeLink, createShareLink, DEFAULT_INCLUDE, ExportError, sharedByLink, signedFilePath, turnOffLink, verifyFileUrl, weekCsv, weekExport, weekIcs, weekPdf, type FileKind, type Include, exportFor, type Scope,
 } from "./export.js";
 
 // What to film (5.6, 5.7), export (5.8-5.10) and the .ics of 5.4.
@@ -130,13 +130,13 @@ sharedRouter.get("/:linkId", async (req, res) => {
   res.json(view);
 });
 
-filesRouter.get("/weeks/:file", async (req, res) => {
+const serveFile = (scope: Scope) => async (req: import("express").Request, res: import("express").Response) => {
   const m = /^([0-9a-f-]{36})\.(pdf|csv|ics)$/.exec(String(req.params.file));
   if (!m) throw notFound("File not found.");
   const [, weekId, kind] = m as unknown as [string, string, FileKind];
-  const inc = verifyFileUrl(weekId, kind, req.query);
+  const inc = verifyFileUrl(weekId, kind, req.query, scope);
   if (!inc) throw new AppError(410, "link_expired", "This download link expired. Export again from the app.");
-  const data = await weekExport(weekId);
+  const data = await exportFor(scope, weekId);
   if (!data) throw notFound("File not found.");
   const name = `${data.businessName} ${data.label}`.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "week";
   res.setHeader("Cache-Control", "private, no-store");
@@ -155,4 +155,7 @@ filesRouter.get("/weeks/:file", async (req, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${name}.pdf"`);
   res.send(pdf);
-});
+};
+filesRouter.get("/weeks/:file", serveFile("week"));
+filesRouter.get("/campaigns/:file", serveFile("campaign"));
+

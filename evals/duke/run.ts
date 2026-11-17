@@ -46,6 +46,8 @@ await db.post.deleteMany({ where: { userId: user.id } });
 await db.week.deleteMany({ where: { userId: user.id } });
 await db.strategy.deleteMany({ where: { userId: user.id } });
 await db.conversation.deleteMany({ where: { userId: user.id } });
+await db.campaign.deleteMany({ where: { userId: user.id } });
+await db.note.deleteMany({ where: { userId: user.id } });
 const cached = { ...BAHIA_TASTE, profile: { ...BAHIA_TASTE.profile, handle } };
 await db.instagramCache.upsert({
   where: { handle },
@@ -137,6 +139,41 @@ if (stratCard) {
     check("shot list: names the real food, no prices", /tray|dish|food|meal|feijoada|moqueca|acaraj|kitchen/i.test(slText) && !/\$\s?\d/.test(slText), slText.slice(0, 500));
     const f2 = await collect("Export week");
     check("export: opens the export card", f2.cards.some((c) => c.type === "export" && c.weekId === wk.id), JSON.stringify(f2.cards));
+  }
+}
+
+// ---------- Phase 5: notes and campaigns ----------
+{
+  const noteConv = await db.conversation.create({ data: { userId: user.id, title: "eval notes" } });
+  let cards: Record<string, unknown>[] = [];
+  let out = "";
+  await runDukeTurn(user.id, noteConv.id, "Note this for later: film the team setting up at the next event, people love that.", { text: (d) => (out += d), card: (c) => cards.push(c), replies: () => {} });
+  const noteCard = cards.find((c) => c.type === "note");
+  check("note: saves it and shows the note card", Boolean(noteCard), `${out.slice(0, 200)} ${JSON.stringify(cards)}`);
+  if (noteCard) {
+    const n = await db.note.findUniqueOrThrow({ where: { id: String(noteCard.noteId) } });
+    check("note: keeps the owner's words, source chat", /team setting up/i.test(n.text) && n.source === "chat", JSON.stringify({ t: n.title, s: n.source, x: n.text }));
+  }
+
+  const { addDays: plusDays, dayInTz: dayOf } = await import("../../src/mvp/lib/time.js");
+  const today = dayOf(new Date(), "America/New_York");
+  const target = plusDays(today, 16);
+  const campConv = await db.conversation.create({ data: { userId: user.id, title: "eval campaign" } });
+  const talk = async (t: string) => {
+    cards = []; out = "";
+    let replies: string[] = [];
+    await runDukeTurn(user.id, campConv.id, t, { text: (d) => (out += d), card: (c) => cards.push(c), replies: (r) => (replies = r) });
+    return replies;
+  };
+  await talk(`I want a campaign for our 5th anniversary party on ${target}. Two weeks before it, three posts a week. Use my active strategy.`);
+  let campCard = cards.find((c) => c.type === "campaign");
+  if (!campCard) { await talk("Yes, go ahead."); campCard = cards.find((c) => c.type === "campaign"); }
+  check("campaign: drafts a campaign card", Boolean(campCard), out.slice(0, 300));
+  if (campCard) {
+    const camp = await db.campaign.findUniqueOrThrow({ where: { id: String(campCard.campaignId) }, include: { posts: true } });
+    const dates = camp.posts.map((p) => dayOf(p.scheduledAt!, "America/New_York")).sort();
+    check("campaign: about 6 posts, from today up to the date", camp.posts.length >= 5 && camp.posts.length <= 7 && dates[0]! >= today && dates.at(-1)! <= target, JSON.stringify({ n: camp.posts.length, dates }));
+    check("campaign: no invented numbers in the objective", !/\d/.test((camp.objective ?? "").replace(/5th|\b20\d\d\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}\b/g, "")), camp.objective ?? "");
   }
 }
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { emptyDayOpening } from "../home/service.js";
+import { campaignOpening, noteOpening } from "./openings.js";
 import { db } from "../db.js";
 import { Prisma } from "../../generated/mvp/index.js";
 import { AppError, notFound } from "../http/errors.js";
@@ -35,6 +36,7 @@ router.get("/", async (req, res) => {
     ? await db.message.findMany({ where: { conversationId: { in: ids }, NOT: { display: { equals: Prisma.DbNull } } }, orderBy: { createdAt: "desc" }, distinct: ["conversationId"], select: { conversationId: true, role: true, display: true } })
     : [];
   const strategies = await db.strategy.findMany({ where: { id: { in: convs.filter((c) => c.objectType === "strategy").map((c) => c.objectId!) } }, select: { id: true, title: true } });
+  const campaigns = await db.campaign.findMany({ where: { id: { in: convs.filter((c) => c.objectType === "campaign").map((c) => c.objectId!) } }, select: { id: true, name: true } });
   const weeks = await db.week.findMany({ where: { id: { in: convs.filter((c) => c.objectType === "week").map((c) => c.objectId!) } }, select: { id: true, startsOn: true } });
   const day = (d: Date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);
   const items = convs.map((c) => {
@@ -43,6 +45,7 @@ router.get("/", async (req, res) => {
     let linked: string | null = null;
     if (c.objectType === "onboarding") linked = "Business Profile";
     if (c.objectType === "strategy") linked = `Strategy · ${strategies.find((s) => s.id === c.objectId)?.title ?? ""}`;
+    if (c.objectType === "campaign") linked = `Campaign · ${campaigns.find((x) => x.id === c.objectId)?.name ?? ""}`;
     if (c.objectType === "week") {
       const w = weeks.find((x) => x.id === c.objectId);
       if (w) linked = `Week · ${day(w.startsOn)} to ${day(new Date(w.startsOn.getTime() + 6 * 864e5))}`;
@@ -54,14 +57,22 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const me = currentUser(req);
-  const body = z.object({ title: z.string().trim().max(120).optional(), emptyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.body ?? {});
-  // 10.4: from an empty day in the calendar, Duke opens with that day.
-  const opening = body.emptyDay ? await emptyDayOpening(me.id, body.emptyDay) : null;
+  const body = z.object({
+    title: z.string().trim().max(120).optional(),
+    emptyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    campaignFor: z.string().min(1).max(60).optional(),
+    fromNote: z.string().uuid().optional(),
+  }).parse(req.body ?? {});
+  // Duke opens with the context the owner came from: an empty day (10.4), a commercial date (7.1) or a note (8.5).
+  const opening = body.emptyDay ? await emptyDayOpening(me.id, body.emptyDay)
+    : body.campaignFor ? await campaignOpening(me.id, me.timezone, body.campaignFor)
+    : body.fromNote ? await noteOpening(me.id, me.timezone, body.fromNote)
+    : null;
   const conv = await db.conversation.create({ data: { userId: me.id, title: body.title ?? opening?.title ?? null } });
   // 4.0b: Duke opens the conversation.
   const text = opening?.text ?? "New conversation. What do you want to work on?";
   const display = opening ? { text, card: opening.card, replies: opening.replies } : { text, replies: { options: ["Plan next week", "A post idea", "A campaign", "Ask a question"] } };
-  const content = opening ? `(App note, not shown to the owner: opened from the calendar, empty day ${body.emptyDay}. "Yes, suggest one" means draft_post for that date.)\n${text}` : text;
+  const content = opening ? `(App note, not shown to the owner: ${opening.note})\n${text}` : text;
   await db.message.create({ data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text: content }], display } });
   res.status(201).json(conv);
 });

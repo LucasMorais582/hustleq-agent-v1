@@ -9,6 +9,8 @@ import businessRoutes from "./business/routes.js";
 import { strategiesRouter, weeksRouter } from "./plan/routes.js";
 import { postsRouter } from "./posts/routes.js";
 import { calendarRouter, homeRouter } from "./home/routes.js";
+import { campaignsRouter, datesRouter } from "./campaigns/routes.js";
+import { notesRouter } from "./notes/routes.js";
 import { exportsRouter, filesRouter, productionRouter, sharedRouter, shotItemsRouter } from "./production/routes.js";
 import { errorHandler } from "./http/errors.js";
 
@@ -31,6 +33,9 @@ export function mvpRouter() {
   router.use("/weeks", productionRouter);
   router.use("/home", homeRouter);
   router.use("/calendar", calendarRouter);
+  router.use("/campaigns", campaignsRouter);
+  router.use("/commercial-dates", datesRouter);
+  router.use("/notes", notesRouter);
   router.use("/shot-list", shotItemsRouter);
   router.use("/exports", exportsRouter);
   router.use("/shared", sharedRouter);
