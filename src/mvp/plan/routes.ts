@@ -7,11 +7,10 @@ import {
   BASE_PILLARS, getStrategy, getWeek, PlanInputError, presentPost, presentStrategy, saveStrategy, saveWeek, updateStrategy,
 } from "./service.js";
 
-// Strategies (4.5-4.7), weeks (5.1-5.4) and posts (5.2, 5.2b). Everything is scoped to the owner.
+// Strategies (4.5-4.7) and weeks (5.1-5.4); posts are in ../posts/routes.ts. Everything is scoped to the owner.
 export const strategiesRouter = Router();
 export const weeksRouter = Router();
-export const postsRouter = Router();
-for (const r of [strategiesRouter, weeksRouter, postsRouter]) r.use(requireUser);
+for (const r of [strategiesRouter, weeksRouter]) r.use(requireUser);
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -101,14 +100,4 @@ weeksRouter.post("/:id/save", async (req, res) => {
   } catch (error) {
     wrap(error);
   }
-});
-
-// ---------- Posts ----------
-
-postsRouter.get("/:id", async (req, res) => {
-  const me = currentUser(req);
-  const { id } = idParam.parse(req.params);
-  const p = await db.post.findFirst({ where: { id, userId: me.id }, include: { pillar: true, week: true } });
-  if (!p) throw notFound("Post not found.");
-  res.json({ ...presentPost(p, me.timezone), weekLabel: p.week ? `Week of ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(p.week.startsOn)}` : null });
 });

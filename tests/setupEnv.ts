@@ -10,4 +10,5 @@ process.env.SOCIAL_DATA_MODE = "fake";
 process.env.APP_ORIGINS = "http://localhost:5173";
 process.env.INVITE_TOKEN_SECRET ||= "test-invite-secret";
 process.env.APP_URL = "http://localhost:5173";
+process.env.MEDIA_BUCKET = "mvp-test-post-media";
 delete process.env.RESEND_API_KEY; // tests never send real email

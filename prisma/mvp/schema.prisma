@@ -34,6 +34,8 @@ model User {
   instagramHandle    String?
   termsAcceptedAt    DateTime?
   termsVersion       String?
+  remindersOn        Boolean   @default(true)   // email on post days (Account · Reminders)
+  reminderTime       String    @default("09:00") // when the reminder goes out, owner's timezone
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -357,6 +359,9 @@ model Post {
   postingReminders   String[]
   detailsStatus      String     @default("pending") // pending | ready | failed
   reminderEmail      Boolean    @default(true)
+  reminderSentAt     DateTime?
+  timeSuggested      Boolean    @default(true) // "· suggested" until the owner sets the time
+  note               String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -375,6 +380,8 @@ model PostMedia {
   id          String   @id @default(uuid())
   postId      String
   storagePath String
+  kind        String   @default("image") // image | video
+  framePaths  String[] // for a video: a few still frames taken in the browser, for validation
   mimeType    String
   sizeBytes   Int
   position    Int      @default(0)

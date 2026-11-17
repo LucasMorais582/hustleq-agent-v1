@@ -3,6 +3,7 @@ import { syncInstagram } from "../instagram/own.js";
 import { JOB_PREPARE, prepareOnboarding } from "../onboarding/service.js";
 import { writePostDetails } from "../plan/details.js";
 import { JOB_SHOT_LIST, writeShotList } from "../production/shotList.js";
+import { runReminders } from "../posts/reminders.js";
 import { defineJob, defineSchedule } from "./queue.js";
 
 // Registry of every job.
@@ -13,6 +14,7 @@ export const JOBS = {
   onboardingPrepare: JOB_PREPARE, // read the posts for onboarding (Claude)
   postDetails: "post-details", // full details of one post (Claude)
   shotList: JOB_SHOT_LIST, // what to film for a week (Claude)
+  postReminders: "post-reminders", // 6.3 reminder emails, every 15 minutes
 } as const;
 
 export let lastPing: { at: Date; data: unknown } | null = null;
@@ -40,3 +42,8 @@ defineJob<{ postId: string }>(JOBS.postDetails, async ({ postId }) => {
 defineJob<{ shotListId: string }>(JOBS.shotList, async ({ shotListId }) => {
   await writeShotList(shotListId);
 });
+defineJob(JOBS.postReminders, async () => {
+  const r = await runReminders();
+  if (r.sent) console.log("[jobs] post reminders", r);
+});
+defineSchedule(JOBS.postReminders, "*/15 * * * *", "UTC");

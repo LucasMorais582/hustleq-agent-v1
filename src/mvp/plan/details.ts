@@ -93,3 +93,34 @@ export async function writePostDetails(postId: string) {
     await db.post.update({ where: { id: postId }, data: { detailsStatus: "failed" } });
   }
 }
+
+// "Regenerate" on 6.1: rewrite only Creative direction or What to produce, keeping the rest.
+export type Section = "creativeDirection" | "whatToProduce";
+
+export async function regenerateSection(postId: string, section: Section) {
+  const post = await db.post.findUniqueOrThrow({ where: { id: postId }, include: { pillar: true, week: { include: { strategy: true } } } });
+  const bp = await db.businessProfile.findUnique({ where: { userId: post.userId } });
+  const values = profileValues(bp as Record<string, unknown> | null);
+  const profile = PROFILE_FIELDS.map((f) => `${f.label}: ${values[f.key] ?? "—"}`).join("\n");
+  const schema = z.object({ [section]: DetailsSchema.shape[section] });
+  const current = section === "creativeDirection" ? post.creativeDirection : post.productionGuidance;
+  const brief = [
+    `Business: ${bp?.businessName ?? "—"}`,
+    profile,
+    `Pillar: ${post.pillar?.name ?? "—"}`,
+    `Format: ${post.format}`,
+    `Title: ${post.title}`,
+    post.caption ? `Caption: ${post.caption}` : "",
+    post.note ? `Owner's note: ${post.note}` : "",
+    current ? `Current version (the owner wants a different take): ${JSON.stringify(current)}` : "",
+  ].filter(Boolean).join("\n");
+  const out = (await parseClaude(
+    { role: "duke", feature: `regenerate_${section}`, userId: post.userId, effort: "low" },
+    { max_tokens: 6000, system: SYSTEM, messages: [{ role: "user", content: `${brief}\n\nWrite a new ${section === "creativeDirection" ? "creative direction" : "what to produce"} for this post. Keep it concrete and different from the current one.` }] },
+    zodOutputFormat(schema)
+  )) as Record<Section, unknown>;
+  return db.post.update({
+    where: { id: postId },
+    data: section === "creativeDirection" ? { creativeDirection: out.creativeDirection as object } : { productionGuidance: out.whatToProduce as object },
+  });
+}

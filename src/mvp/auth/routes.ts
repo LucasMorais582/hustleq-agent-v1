@@ -97,8 +97,16 @@ router.post("/reset", resetLimiter, async (req, res) => {
 });
 
 // Never send passwordHash or other internals to the client.
-export function publicUser(u: { id: string; email: string; role: string; timezone: string; instagramHandle: string | null }) {
-  return { id: u.id, email: u.email, role: u.role, timezone: u.timezone, instagramHandle: u.instagramHandle };
+export function publicUser(u: { id: string; email: string; role: string; timezone: string; instagramHandle: string | null; remindersOn?: boolean; reminderTime?: string }) {
+  return { id: u.id, email: u.email, role: u.role, timezone: u.timezone, instagramHandle: u.instagramHandle, reminders: { on: u.remindersOn ?? true, time: u.reminderTime ?? "09:00" } };
 }
+
+// Account · Reminders: email on post days, and the time it's sent (owner's timezone).
+router.patch("/me/reminders", requireUser, async (req, res) => {
+  const me = currentUser(req);
+  const body = z.object({ on: z.boolean().optional(), time: z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/).optional() }).parse(req.body);
+  const user = await db.user.update({ where: { id: me.id }, data: { ...(body.on !== undefined ? { remindersOn: body.on } : {}), ...(body.time ? { reminderTime: body.time } : {}) } });
+  res.json(publicUser(user));
+});
 
 export default router;

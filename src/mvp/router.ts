@@ -6,7 +6,8 @@ import inviteRoutes from "./invites/routes.js";
 import adminRoutes from "./admin/routes.js";
 import onboardingRoutes from "./onboarding/routes.js";
 import businessRoutes from "./business/routes.js";
-import { postsRouter, strategiesRouter, weeksRouter } from "./plan/routes.js";
+import { strategiesRouter, weeksRouter } from "./plan/routes.js";
+import { postsRouter } from "./posts/routes.js";
 import { exportsRouter, filesRouter, productionRouter, sharedRouter, shotItemsRouter } from "./production/routes.js";
 import { errorHandler } from "./http/errors.js";
 
