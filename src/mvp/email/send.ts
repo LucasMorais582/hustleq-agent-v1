@@ -5,6 +5,8 @@ import type { Email } from "./templates.js";
 // domain is verified) the email is only logged in EmailLog, so every flow still works end to end.
 
 const FROM = () => process.env.EMAIL_FROM || "Duke from HustleQ <duke@hustleq.tech>";
+// Replies ("Questions? Reply to this email.") go to the team inbox.
+const REPLY_TO = () => process.env.EMAIL_REPLY_TO || "contact@hustleqai.com";
 export const appUrl = (path = "") => (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "") + path;
 export const WAITLIST_URL = "https://hustleq.tech/#waitlist";
 
@@ -21,7 +23,7 @@ export async function sendEmail(to: string, email: Email, refId?: string) {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM(), to: [to], subject: email.subject, html: email.html, text: email.text }),
+      body: JSON.stringify({ from: FROM(), to: [to], reply_to: REPLY_TO(), subject: email.subject, html: email.html, text: email.text }),
       signal: AbortSignal.timeout(15_000),
     });
     const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
