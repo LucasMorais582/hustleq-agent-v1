@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { costReport } from "./costs.js";
 import { db } from "../db.js";
 import { AppError, notFound } from "../http/errors.js";
 import { currentUser, requireAdmin, requireUser } from "../auth/middleware.js";
@@ -122,6 +123,12 @@ router.post("/invites/:id/revoke", async (req, res) => {
 });
 
 // ---------- "Not my account" requests (E.4) ----------
+
+// Cost per account this month (Claude), for the per-customer cost study.
+router.get("/costs", async (req, res) => {
+  const { month } = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional() }).parse(req.query);
+  res.json(await costReport(month ?? new Date().toISOString().slice(0, 7)));
+});
 
 router.get("/account-requests", async (_req, res) => {
   const rows = await db.accountChangeRequest.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
