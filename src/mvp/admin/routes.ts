@@ -124,6 +124,42 @@ router.post("/invites/:id/revoke", async (req, res) => {
 
 // ---------- "Not my account" requests (E.4) ----------
 
+// ---------- Team: who is an admin ----------
+
+// Accounts, with search by email or business name (Admin › Team).
+router.get("/users", async (req, res) => {
+  const { q } = z.object({ q: z.string().trim().max(80).optional() }).parse(req.query);
+  const users = await db.user.findMany({
+    where: q ? { OR: [{ email: { contains: q, mode: "insensitive" } }, { business: { businessName: { contains: q, mode: "insensitive" } } }] } : {},
+    select: { id: true, email: true, role: true, billingExempt: true, instagramHandle: true, createdAt: true, business: { select: { businessName: true } } },
+    orderBy: [{ role: "asc" }, { createdAt: "desc" }],
+    take: 100,
+  });
+  const me = currentUser(req);
+  res.json({
+    items: users.map((u) => ({
+      id: u.id, email: u.email, role: u.role, managed: u.billingExempt, instagramHandle: u.instagramHandle,
+      businessName: u.business?.businessName ?? null, createdAt: u.createdAt, isMe: u.id === me.id,
+    })),
+  });
+});
+
+// Make an account admin, or take it back. Never yourself, never the last admin. Logged.
+router.post("/users/:id/role", async (req, res) => {
+  const me = currentUser(req);
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const { role } = z.object({ role: z.enum(["admin", "user"]) }).parse(req.body);
+  if (id === me.id) throw new AppError(400, "own_role", "You can’t change your own access. Ask another admin.");
+  const target = await db.user.findUnique({ where: { id } });
+  if (!target) throw notFound("Account not found.");
+  if (target.role !== role) {
+    if (role === "user" && (await db.user.count({ where: { role: "admin" } })) <= 1) throw new AppError(400, "last_admin", "There must be at least one admin.");
+    await db.user.update({ where: { id }, data: { role } });
+    await audit(me.id, role === "admin" ? "admin_granted" : "admin_revoked", { email: target.email }, id);
+  }
+  res.json({ id, role });
+});
+
 // Cost per account this month (Claude), for the per-customer cost study.
 router.get("/costs", async (req, res) => {
   const { month } = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional() }).parse(req.query);

@@ -18,7 +18,7 @@ const DetailsSchema = z.object({
     body: z.string().describe("2 to 4 short sentences"),
     callToAction: z.string().describe("Ends with a question or a clear next step"),
   }),
-  hashtags: z.array(z.string()).describe("4 to 8 hashtags, each starting with #"),
+  hashtags: z.array(z.string()).describe("3 hashtags, at most 5, each starting with #. Specific to the business and its city, not generic ones like #food or #love"),
   creativeDirection: z.object({
     visualConcept: z.string(),
     openingImpact: z.string(),
@@ -81,7 +81,7 @@ export async function writePostDetails(postId: string) {
         idea: d.idea,
         captionParts: d.caption,
         caption,
-        hashtags: d.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).slice(0, 10),
+        hashtags: d.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).slice(0, 5),
         creativeDirection: d.creativeDirection,
         productionGuidance: d.whatToProduce,
         postingReminders: d.postingReminders,

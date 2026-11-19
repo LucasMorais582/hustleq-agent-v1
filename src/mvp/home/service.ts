@@ -11,6 +11,8 @@ import type { IgPost } from "../socialData/index.js";
 
 export class CalendarInputError extends Error {}
 
+// Instagram sends -1 when the owner hides the count.
+const count = (n: number | null) => (n != null && n > 0 ? n : 0);
 const igLabel = (f: string) => FORMAT_LABEL[(f === "image" ? "feed" : f) as Format] ?? "Post";
 const STATUS_LABEL = { draft: "Draft", scheduled: "Scheduled", posted: "Posted", cancelled: "Cancelled" } as const;
 const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
@@ -81,8 +83,8 @@ function numbers(bundle: Awaited<ReturnType<typeof cachedInstagram>>) {
   const reels = posts.filter((p) => p.format === "reel");
   return {
     followers: bundle.profile.followers,
-    likes: posts.reduce((s, p) => s + (p.likes ?? 0), 0),
-    views: reels.reduce((s, p) => s + (p.views ?? 0), 0),
+    likes: posts.reduce((s, p) => s + count(p.likes), 0),
+    views: reels.reduce((s, p) => s + count(p.views), 0),
     basedOn: posts.length,
     // Weekly comparisons need daily snapshots (Social Data API, phase 6); until then, the last posts.
     note: `From your last ${posts.length} posts. Weekly numbers start next week.`,
@@ -214,20 +216,31 @@ export async function getNumber(userId: string, metric: "followers" | "likes" | 
   if (metric === "followers") {
     return { metric, title: "Followers", value: bundle.profile.followers, note: "Followers today. Growth week by week starts next week.", items: [], comment: null };
   }
-  const list = (metric === "views" ? posts.filter((p) => p.format === "reel") : posts).map((p, i, arr) => ({
-    label: `${metric === "views" ? "Reel" : igLabel(p.format)} ${arr.length - i}`,
-    value: (metric === "views" ? p.views : p.likes) ?? 0,
+  // Each post is named by type and day, with the start of its caption and its picture, so the
+  // owner knows which one it is (not "Reel 1").
+  const day = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: user.timezone }).format(new Date(iso)) : null);
+  const excerpt = (c: string | null) => {
+    const line = (c ?? "").split("\n").map((x) => x.trim()).find(Boolean) ?? "";
+    return line.length > 70 ? `${line.slice(0, 68).trimEnd()}…` : line || null;
+  };
+  const list = (metric === "views" ? posts.filter((p) => p.format === "reel") : posts).map((p) => ({
+    label: [igLabel(p.format), day(p.publishedAt)].filter(Boolean).join(" · "),
+    caption: excerpt(p.caption),
+    thumbnailUrl: p.thumbnailUrl,
+    url: p.url,
+    value: count(metric === "views" ? p.views : p.likes),
+    hidden: (metric === "views" ? p.views : p.likes) === -1, // the owner hid the count on Instagram
     date: p.publishedAt,
-  })).reverse();
+  }));
   const value = list.reduce((s, x) => s + x.value, 0);
   let comment: string | null = null;
   if (metric === "views" && list.length) {
     const top = [...list].sort((a, b) => b.value - a.value)[0]!;
-    comment = value > 0 ? `${top.label} brought the most views. Reels are how new people find you, so I keep at least one in each week.` : null;
+    comment = value > 0 ? `Your ${top.label.replace(" · ", " from ")}${top.caption ? ` (“${top.caption}”)` : ""} brought the most views. Reels are how new people find you, so I keep at least one in each week.` : null;
   }
   if (metric === "likes" && list.length >= 3) {
     const byFormat = new Map<string, { n: number; sum: number }>();
-    posts.forEach((p) => { const s = byFormat.get(p.format) ?? { n: 0, sum: 0 }; s.n += 1; s.sum += p.likes ?? 0; byFormat.set(p.format, s); });
+    posts.forEach((p) => { const s = byFormat.get(p.format) ?? { n: 0, sum: 0 }; s.n += 1; s.sum += count(p.likes); byFormat.set(p.format, s); });
     const best = [...byFormat.entries()].filter(([, s]) => s.n >= 3).sort((a, b) => b[1].sum / b[1].n - a[1].sum / a[1].n)[0];
     comment = best ? `${igLabel(best[0])}s got the most likes per post. I’ll keep using them.` : null;
   }
