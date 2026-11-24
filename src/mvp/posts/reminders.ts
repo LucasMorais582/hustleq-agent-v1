@@ -54,6 +54,7 @@ export async function runReminders(now = new Date()) {
         mediaSummary,
         caption: p.caption,
         hashtags: p.hashtags,
+        reminders: Array.isArray(p.postingReminders) ? (p.postingReminders as unknown[]).filter((r): r is string => typeof r === "string") : [],
         imageUrls: paths.map((x) => urls.get(x)).filter((u): u is string => Boolean(u)),
         url: appUrl(`/posts/${p.id}`),
         settingsUrl: appUrl("/settings/account"),

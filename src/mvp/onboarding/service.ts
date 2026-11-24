@@ -1,3 +1,4 @@
+import { generateNicheDates } from "../campaigns/nicheDates.js";
 import { db, table } from "../db.js";
 import { FIELD_KEYS, PROFILE_FIELDS, profileValues } from "../business/fields.js";
 import { cachedInstagram, FORMAT_LABEL, formatStats, syncInstagram } from "../instagram/own.js";
@@ -19,6 +20,7 @@ export const R = {
   yes: "Yes",
   fix: "Let me fix something",
   somethingElse: "Something else",
+  skip: "Skip for now",
   review: "Review my profile",
   looksGood: "Looks good",
   gotIt: "Got it",
@@ -133,6 +135,7 @@ function summaryText(analysis: Analysis, bundle: NonNullable<Awaited<ReturnType<
   return lines.join("\n");
 }
 
+const REQUIRED_FIELDS: string[] = ["whatYouDo", "niche"];
 const CUSTOMER_CHANNELS = ["Instagram", "Word of mouth", "Referrals", "Google / Maps", "Events and fairs", "Flyers and local media"];
 
 function questionDisplay(analysis: Analysis | null | undefined, index: number, first: boolean): Display {
@@ -146,7 +149,8 @@ function questionDisplay(analysis: Analysis | null | undefined, index: number, f
   return {
     text: `${intro}${field.question}`,
     card: { type: "question", field: field.key, index: index + 1, total: PROFILE_FIELDS.length },
-    replies: { options: [...options, R.somethingElse], multi: true, placeholder: "Or type your own…" },
+    // Every question can be skipped except what the business does and its niche (Duke needs those).
+    replies: { options: [...options, R.somethingElse, ...(REQUIRED_FIELDS.includes(field.key) ? [] : [R.skip])], multi: true, placeholder: "Or type your own…" },
   };
 }
 
@@ -308,6 +312,8 @@ export async function replyOnboarding(userId: string, input: ReplyInput) {
         return;
       }
       await db.businessProfile.update({ where: { userId }, data: { completedAt: new Date() } });
+      // Commercial dates for this niche: Duke drafts them now, the team approves them in Admin.
+      void generateNicheDates(userId).catch((e) => console.error("[onboarding] niche dates", e));
       await db.onboardingState.update({ where: { userId }, data: { step: 4 } });
       await patchData(userId, { sub: null });
       await say(conversationId, "assistant", {
@@ -318,7 +324,13 @@ export async function replyOnboarding(userId: string, input: ReplyInput) {
     }
     const index = data.fieldIndex ?? 0;
     const key = FIELD_KEYS[index]!;
-    await db.businessProfile.update({ where: { userId }, data: { [key]: said.slice(0, 600) } });
+    const answer = [...choices.filter((c) => c !== R.somethingElse && c !== R.skip), text].filter(Boolean).join(", ");
+    if (!answer && REQUIRED_FIELDS.includes(key)) {
+      await say(conversationId, "assistant", { text: "I need this one to plan your posts. Pick an option or type a short answer.", replies: questionDisplay(data.analysis, index, false).replies! });
+      return;
+    }
+    // Skipped: left empty. Duke brings it up when a strategy is used for a post or campaign.
+    await db.businessProfile.update({ where: { userId }, data: { [key]: answer ? answer.slice(0, 600) : null } });
     const next = index + 1;
     if (next < FIELD_KEYS.length) {
       await patchData(userId, { fieldIndex: next });

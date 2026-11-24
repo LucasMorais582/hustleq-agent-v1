@@ -64,7 +64,10 @@ export function verifyFileUrl(weekId: string, kind: FileKind, q: { i?: unknown; 
 
 // ---------- What gets exported ----------
 
-type Guidance = { objective?: string; recordingPlan?: string[]; editing?: string; assets?: string; checklist?: string[] };
+type Slide = { shows?: string; text?: string; howToShoot?: string };
+type Guidance = { objective?: string; recordingPlan?: string[]; slides?: Slide[]; editing?: string; assets?: string; checklist?: string[] };
+// A carousel's plan is read slide by slide: what it shows, its text, how to shoot it.
+const slideLines = (sl: Slide, i: number) => [`Slide ${i + 1}`, sl.shows ? `Shows: ${sl.shows}` : "", sl.text ? `Text on the slide: ${sl.text}` : "", sl.howToShoot ? `How to shoot: ${sl.howToShoot}` : ""].filter(Boolean);
 type CaptionParts = { hook?: string; body?: string; callToAction?: string };
 
 export async function weekExport(weekId: string, opts: { userId?: string; requireSaved?: boolean } = {}) {
@@ -230,7 +233,8 @@ export function weekCsv(data: WeekExport, inc: Include) {
     if (inc.creativeDirection) row.push(p.creativeDirection ? Object.entries(CREATIVE_LABELS).filter(([k]) => p.creativeDirection?.[k]).map(([k, l]) => `${l}: ${p.creativeDirection![k]}`).join("\n") : "");
     if (inc.whatToProduce) {
       const g = p.whatToProduce;
-      row.push(g?.objective ?? "", (g?.recordingPlan ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n"), (g?.checklist ?? []).join("\n"));
+      const plan = g?.slides?.length ? g.slides.map((sl, i) => slideLines(sl, i).join("\n")).join("\n\n") : (g?.recordingPlan ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n");
+      row.push(g?.objective ?? "", plan, (g?.checklist ?? []).join("\n"));
     }
     if (inc.shotList) {
       const shots = data.shotList?.byPost.find((b) => b.id === p.id)?.shots ?? [];
@@ -285,7 +289,13 @@ export function weekPdf(data: WeekExport, inc: Include): Promise<Buffer> {
         const g = p.whatToProduce;
         h("What to produce");
         para(g.objective);
-        if (g.recordingPlan?.length) { doc.moveDown(0.3).font("Helvetica-Bold").text("Recording plan"); list(g.recordingPlan, true); }
+        if (g.slides?.length) {
+          g.slides.forEach((sl, i) => {
+            const [title, ...rest] = slideLines(sl, i);
+            doc.moveDown(0.3).font("Helvetica-Bold").fontSize(10.5).fillColor(ink).text(pdfText(title));
+            rest.forEach((line) => doc.font("Helvetica").fontSize(10.5).fillColor(ink).text(pdfText(line), { indent: 10, lineGap: 2 }));
+          });
+        } else if (g.recordingPlan?.length) { doc.moveDown(0.3).font("Helvetica-Bold").text("Recording plan"); list(g.recordingPlan, true); }
         if (g.editing) { doc.moveDown(0.3).font("Helvetica-Bold").text("Editing"); para(g.editing); }
         if (g.assets) { doc.moveDown(0.3).font("Helvetica-Bold").text("Assets"); para(g.assets); }
         if (g.checklist?.length) { doc.moveDown(0.3).font("Helvetica-Bold").text("Checklist"); list(g.checklist); }

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { costReport } from "./costs.js";
+import { deleteNicheDate, generateNicheDates, nicheDatesForReview, reviewNicheDate } from "../campaigns/nicheDates.js";
 import { db } from "../db.js";
 import { AppError, notFound } from "../http/errors.js";
 import { currentUser, requireAdmin, requireUser } from "../auth/middleware.js";
@@ -161,6 +162,29 @@ router.post("/users/:id/role", async (req, res) => {
 });
 
 // Cost per account this month (Claude), for the per-customer cost study.
+// Commercial dates by niche: they show to owners right away; the team fixes, hides or deletes them.
+router.get("/niche-dates", async (_req, res) => {
+  res.json(await nicheDatesForReview());
+});
+
+router.post("/niche-dates/generate/:userId", async (req, res) => {
+  const { userId } = z.object({ userId: z.string().uuid() }).parse(req.params);
+  res.json(await generateNicheDates(userId));
+});
+
+router.post("/niche-dates/:id", async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  const body = z.object({ status: z.enum(["approved", "rejected"]), name: z.string().trim().min(1).max(60).optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.body);
+  if (!(await reviewNicheDate(id, body))) throw notFound("Date not found.");
+  res.json({ ok: true });
+});
+
+router.delete("/niche-dates/:id", async (req, res) => {
+  const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+  if (!(await deleteNicheDate(id))) throw notFound("Date not found.");
+  res.json({ ok: true });
+});
+
 router.get("/costs", async (req, res) => {
   const { month } = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional() }).parse(req.query);
   res.json(await costReport(month ?? new Date().toISOString().slice(0, 7)));

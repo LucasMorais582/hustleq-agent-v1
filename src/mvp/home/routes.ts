@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError, notFound } from "../http/errors.js";
-import { answerMatch, CalendarInputError, getCalendar, getHome, getNumber } from "./service.js";
+import { announceTodayPosts, answerMatch, CalendarInputError, getCalendar, getHome, getNumber } from "./service.js";
 
 // Home (3.1-3.4), Calendar (10.x) and the 6.4 match. Owner only.
 export const homeRouter = Router();
@@ -18,6 +18,12 @@ homeRouter.get("/", async (req, res) => {
   const me = currentUser(req);
   const { week } = z.object({ week: z.enum(["this", "next"]).default("this") }).parse(req.query);
   res.json(await getHome(me.id, week));
+});
+
+// The app calls this when it opens: on a post day, Duke mentions the post in the chat (once).
+homeRouter.post("/today-message", async (req, res) => {
+  const me = currentUser(req);
+  res.json(await announceTodayPosts(me.id, me.timezone));
 });
 
 homeRouter.get("/numbers/:metric", async (req, res) => {

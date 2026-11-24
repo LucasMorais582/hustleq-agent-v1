@@ -5,7 +5,7 @@ import { currentUser, requireUser } from "../auth/middleware.js";
 import { AppError, notFound } from "../http/errors.js";
 import { FORMATS } from "../plan/service.js";
 import { DailyCapReached, refundHeavyGeneration, useHeavyGeneration } from "../plan/limits.js";
-import { regenerateSection } from "../plan/details.js";
+import { regenerateSection, writeCaption } from "../plan/details.js";
 import { addMedia, getFullPost, PostInputError, removeMedia, reorderMedia, requestUpload, setPostStatus, updatePost } from "./service.js";
 import { validatePost, ValidationLimitReached } from "./validate.js";
 
@@ -80,6 +80,25 @@ postsRouter.post("/:id/regenerate", requireActivePlan, async (req, res) => {
       throw error;
     }
     return getFullPost(me.id, id);
+  }));
+});
+
+// "New caption": returns a caption to try; nothing is saved. Counts toward the daily limit.
+postsRouter.post("/:id/caption", requireActivePlan, async (req, res) => {
+  const me = currentUser(req);
+  const { id } = idParam.parse(req.params);
+  const { style, current } = z.object({ style: z.enum(["shorter", "casual", "direct"]).optional(), current: z.string().max(4000).optional() }).parse(req.body ?? {});
+  res.json(await run(async () => {
+    const post = await getFullPost(me.id, id);
+    if (!post) return null;
+    if (!post.editable) throw new PostInputError("A posted post can't be changed.");
+    await useHeavyGeneration(me.id, me.timezone);
+    try {
+      return { caption: await writeCaption(id, current ?? post.caption ?? null, style) };
+    } catch (error) {
+      await refundHeavyGeneration(me.id, me.timezone);
+      throw error;
+    }
   }));
 });
 

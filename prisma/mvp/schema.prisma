@@ -505,6 +505,9 @@ model UserCommercialDate {
   skippedYear      Int?      // the year "Not this year" applies to
   repeats          Boolean   @default(false) // own date: every year
   suggestCampaign  Boolean   @default(true)  // own date: Duke suggests a campaign 3 to 4 weeks before
+  source           String    @default("own")      // own (added by the owner) | niche (Duke, from the niche)
+  reviewStatus     String    @default("approved") // niche dates: approved (shown) | rejected (hidden by the team)
+  tip              String?                        // niche dates: why it fits this business
   createdAt        DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

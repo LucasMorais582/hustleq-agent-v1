@@ -34,7 +34,7 @@ export function howFar(days: number) {
 
 export type DateRow = {
   id: string; // CommercialDate id, or "own:<UserCommercialDate id>"
-  kind: "us" | "own";
+  kind: "us" | "own" | "niche"; // niche: suggested by Duke for this business, approved by the team
   name: string;
   date: string;
   tip: string | null;
@@ -50,7 +50,7 @@ export async function upcomingDates(userId: string, tz: string, horizonDays = 36
   const until = addDays(today, horizonDays);
   const [us, own, prefs, campaigns] = await Promise.all([
     db.commercialDate.findMany({ where: { country: "US", date: { gte: new Date(`${today}T00:00:00Z`), lte: new Date(`${until}T00:00:00Z`) } }, orderBy: { date: "asc" } }),
-    db.userCommercialDate.findMany({ where: { userId, commercialDateId: null } }),
+    db.userCommercialDate.findMany({ where: { userId, commercialDateId: null, OR: [{ source: "own" }, { source: "niche", reviewStatus: "approved" }] } }),
     db.userCommercialDate.findMany({ where: { userId, commercialDateId: { not: null } } }),
     db.campaign.findMany({ where: { userId, dateId: { not: null } }, select: { id: true, name: true, status: true, dateId: true, endsOn: true } }),
   ]);
@@ -68,9 +68,11 @@ export async function upcomingDates(userId: string, tz: string, horizonDays = 36
     if (date < today || date > until) continue;
     const id = `own:${o.id}`;
     const camp = campaigns.find((c) => c.dateId === id && iso(c.endsOn) >= addDays(date, -60));
-    rows.push({ id, kind: "own", name: o.name, date, tip: null, suggestOn: o.suggestCampaign ? addDays(date, -SUGGEST_DAYS_BEFORE) : null, campaign: camp ? { id: camp.id, name: camp.name, status: camp.status } : null, skipped: Boolean(o.notThisYear && o.skippedYear === Number(date.slice(0, 4))), repeats: o.repeats });
+    rows.push({ id, kind: o.source === "niche" ? "niche" : "own", name: o.name, date, tip: o.tip, suggestOn: o.suggestCampaign ? addDays(date, -SUGGEST_DAYS_BEFORE) : null, campaign: camp ? { id: camp.id, name: camp.name, status: camp.status } : null, skipped: Boolean(o.notThisYear && o.skippedYear === Number(date.slice(0, 4))), repeats: o.repeats });
   }
-  return rows.sort((a, b) => a.date.localeCompare(b.date));
+  // Same day: the business's own date first, then its niche dates, then the general US ones.
+  const rank = { own: 0, niche: 1, us: 2 } as const;
+  return rows.sort((a, b) => a.date.localeCompare(b.date) || rank[a.kind] - rank[b.kind]);
 }
 
 export function dateState(r: DateRow, today: string) {
@@ -94,7 +96,7 @@ export async function addOwnDate(userId: string, input: { name: string; date: st
 }
 
 export async function removeOwnDate(userId: string, id: string) {
-  const r = await db.userCommercialDate.deleteMany({ where: { id, userId, commercialDateId: null } });
+  const r = await db.userCommercialDate.deleteMany({ where: { id, userId, commercialDateId: null, source: "own" } });
   return r.count > 0;
 }
 
@@ -103,7 +105,7 @@ export async function skipDate(userId: string, tz: string, dateId: string) {
   const row = (await upcomingDates(userId, tz)).find((r) => r.id === dateId);
   if (!row) return null;
   const year = Number(row.date.slice(0, 4));
-  if (row.kind === "own") {
+  if (row.kind === "own" || row.kind === "niche") {
     await db.userCommercialDate.updateMany({ where: { id: dateId.slice(4), userId }, data: { notThisYear: true, skippedYear: year } });
   } else {
     const pref = await db.userCommercialDate.findFirst({ where: { userId, commercialDateId: dateId } });

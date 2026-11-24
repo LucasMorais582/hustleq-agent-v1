@@ -8,6 +8,7 @@ import { campaignSuggestion } from "../campaigns/service.js";
 import { activeStrategy } from "../plan/service.js";
 import { cachedInstagram } from "../instagram/own.js";
 import { bestTime, timeLabel, weekStartFor } from "../plan/timing.js";
+import { PROFILE_FIELDS } from "../business/fields.js";
 
 // One owner message → Duke's answer, as an agent loop:
 // Claude answers with text and/or tool calls; the backend runs the tools and loops until Claude is done.
@@ -36,10 +37,12 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
     user.instagramHandle ? cachedInstagram(user.instagramHandle) : null,
     db.week.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 3, select: { id: true, startsOn: true, status: true } }),
   ]);
-  const [campaigns, suggestion] = await Promise.all([
+  const [campaigns, suggestion, bp] = await Promise.all([
     db.campaign.findMany({ where: { userId, status: "saved", endsOn: { gte: new Date() } }, orderBy: { startsOn: "asc" }, take: 5, select: { id: true, name: true, startsOn: true, endsOn: true } }),
     campaignSuggestion(userId, tz),
+    db.businessProfile.findUnique({ where: { userId } }),
   ]);
+  const unanswered = bp?.completedAt ? PROFILE_FIELDS.filter((f) => !(bp as Record<string, unknown>)[f.key]) : [];
   const best = bestTime(bundle?.posts ?? [], tz);
   const lines = [
     `Today is ${today} (${tz}). This week starts ${weekStartFor("this", tz)}, next week starts ${weekStartFor("next", tz)} (Mondays).`,
@@ -54,6 +57,9 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
     campaigns.length
       ? `Saved campaigns: ${campaigns.map((c) => `"${c.name}" (id ${c.id}, ${c.startsOn.toISOString().slice(0, 10)} to ${c.endsOn.toISOString().slice(0, 10)})`).join("; ")}.`
       : "No saved campaigns.",
+    unanswered.length
+      ? `Business Profile questions the owner skipped: ${unanswered.map((f) => `${f.label} ("${f.question}")`).join("; ")}.`
+      : "",
     suggestion ? `Coming up: ${suggestion.name} on ${suggestion.date} (dateId ${suggestion.dateId}), no campaign yet. Bring it up once if it fits the conversation.` : "",
     // Remove lines from here as the features ship.
     "In this version you can: read and update the Business Profile, read the Instagram numbers, create strategies, plan weeks (draft, refine, save), list what to film for a saved week and export it (share link, PDF, CSV). The Home shows today, this week and campaign suggestions; the Calendar shows day, week and month, and posts move there. On each post's page (tap the post) the owner edits date, time, type, caption and hashtags, uploads photos or video, and taps \"Validate with Duke\" (30 a month) to have you check them. Campaigns for commercial dates and notes work too. Explore, Analytics and the monthly review are coming soon: if asked, say so and offer what you can do now.",

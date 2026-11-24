@@ -12,6 +12,8 @@ describe("admin costs", () => {
     const owner = await makeUser();
     const month = "2031-03"; // a month nothing else writes to
     const at = new Date("2031-03-05T12:00:00Z");
+    // Earlier runs wrote to this month too: start from an empty month.
+    await db.aiUsage.deleteMany({ where: { createdAt: { gte: new Date("2031-03-01T00:00:00Z"), lt: new Date("2031-04-01T00:00:00Z") } } });
     for (const [feature, cost] of [["chat", 0.01], ["chat", 0.02], ["post_details", 0.05]] as const) {
       await db.aiUsage.create({ data: { userId: owner.user.id, feature, model: "claude-sonnet-5-5", inputTokens: 100, outputTokens: 50, costUsd: cost, createdAt: at } });
     }

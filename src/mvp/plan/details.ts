@@ -32,6 +32,11 @@ const DetailsSchema = z.object({
   whatToProduce: z.object({
     objective: z.string().describe("What to make, e.g. 'A 20 to 30 second vertical video of the dish being made'"),
     recordingPlan: z.array(z.string()).describe("Numbered shots or slides, in order"),
+    slides: z.array(z.object({
+      shows: z.string().describe("What this slide shows (the image)"),
+      text: z.string().describe("The text written on the slide, or empty if none"),
+      howToShoot: z.string().describe("How to photograph or make this slide with a phone"),
+    })).describe("Carousel only: one entry per slide, in order, matching the recording plan. Empty array for any other format."),
     editing: z.string(),
     assets: z.string().describe("What the owner needs at hand"),
     checklist: z.array(z.string()).describe("3 to 5 short checks before posting"),
@@ -123,4 +128,42 @@ export async function regenerateSection(postId: string, section: Section) {
     where: { id: postId },
     data: section === "creativeDirection" ? { creativeDirection: out.creativeDirection as object } : { productionGuidance: out.whatToProduce as object },
   });
+}
+
+// "New caption" on 6.1: a fresh caption for the owner to try. Not saved here: the app puts it in
+// the caption box (with Undo) and the owner saves the post as usual.
+export type CaptionStyle = "shorter" | "casual" | "direct";
+const STYLE_NOTE: Record<CaptionStyle, string> = {
+  shorter: "Make it noticeably shorter than the current one: 1 or 2 short lines plus the call to action.",
+  casual: "Make it more casual and relaxed, like the owner talking to regulars.",
+  direct: "Make it more direct: lead with the offer or the reason to come, and a clear call to action.",
+};
+
+export async function writeCaption(postId: string, current: string | null, style?: CaptionStyle) {
+  const post = await db.post.findUniqueOrThrow({ where: { id: postId }, include: { pillar: true } });
+  const bp = await db.businessProfile.findUnique({ where: { userId: post.userId } });
+  const values = profileValues(bp as Record<string, unknown> | null);
+  const profile = PROFILE_FIELDS.map((f) => `${f.label}: ${values[f.key] ?? "—"}`).join("\n");
+  const idea = post.idea as { hook?: string; goal?: string } | null;
+  const brief = [
+    `Business: ${bp?.businessName ?? "—"}`,
+    profile,
+    `Pillar: ${post.pillar?.name ?? "—"}`,
+    `Format: ${post.format}`,
+    `Title: ${post.title}`,
+    idea?.hook ? `Hook idea: ${idea.hook}` : "",
+    idea?.goal ? `Goal: ${idea.goal}` : "",
+    post.note ? `Owner's note: ${post.note}` : "",
+    current ? `Current caption (the owner wants a different one):\n${current}` : "",
+  ].filter(Boolean).join("\n");
+  const out = await parseClaude(
+    { role: "duke", feature: "regenerate_caption", userId: post.userId, effort: "low" },
+    {
+      max_tokens: 2000,
+      system: `${SYSTEM}\n- Write the caption in the business's own voice, never as Duke. No hashtags in the caption.`,
+      messages: [{ role: "user", content: `${brief}\n\nWrite a new caption for this post, clearly different from the current one.${style ? ` ${STYLE_NOTE[style]}` : ""}` }],
+    },
+    zodOutputFormat(z.object({ caption: DetailsSchema.shape.caption }))
+  );
+  return [out.caption.hook, out.caption.body, out.caption.callToAction].join("\n\n");
 }

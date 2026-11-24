@@ -101,7 +101,7 @@ export const accountUpdatedEmail = (v: { handle: string; url: string }) =>
   });
 
 // 6.3 · morning of the post
-export const postReminderEmail = (v: { timeLabel: string; formatLabel: string; title: string; mediaSummary: string; caption: string | null; hashtags: string[]; imageUrls: string[]; url: string; settingsUrl: string }) => {
+export const postReminderEmail = (v: { timeLabel: string; formatLabel: string; title: string; mediaSummary: string; caption: string | null; hashtags: string[]; reminders?: string[]; imageUrls: string[]; url: string; settingsUrl: string }) => {
   const imgs = v.imageUrls.slice(0, 4).map((u) => `<img src="${esc(u)}" alt="" width="112" height="112" style="width:112px;height:112px;object-fit:cover;border-radius:10px;margin:0 6px 6px 0;display:inline-block">`).join("");
   const caption = [v.caption, v.hashtags.join(" ")].filter(Boolean).join("\n\n");
   return build("post_reminder", `Today at ${v.timeLabel}: ${v.title}`, {
@@ -111,6 +111,7 @@ export const postReminderEmail = (v: { timeLabel: string; formatLabel: string; t
       `${esc(v.mediaSummary)} Copy the caption, post at ${esc(v.timeLabel)}, and I’ll find it on your profile tomorrow.`,
       ...(imgs ? [imgs] : []),
       ...(caption ? [`<span style="display:block;background:${C.lilac};border-radius:12px;padding:14px;white-space:pre-wrap;font-size:14px;line-height:20px">${esc(caption)}</span>`] : []),
+      ...(v.reminders?.length ? [`<strong>Before you post</strong><br>${v.reminders.map((r) => `· ${esc(r)}`).join("<br>")}`] : []),
     ],
     button: { label: "Open post in HustleQ", url: v.url },
     notes: [`<a href="${esc(v.settingsUrl)}" style="color:${C.muted}">Turn off reminders in Account settings.</a>`],
