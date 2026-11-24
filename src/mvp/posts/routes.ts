@@ -8,6 +8,7 @@ import { DailyCapReached, refundHeavyGeneration, useHeavyGeneration } from "../p
 import { regenerateSection, writeCaption } from "../plan/details.js";
 import { addMedia, getFullPost, PostInputError, removeMedia, reorderMedia, requestUpload, setPostStatus, updatePost } from "./service.js";
 import { validatePost, ValidationLimitReached } from "./validate.js";
+import { postPreview } from "./preview.js";
 
 // One post (6.1, 6.2). Everything is scoped to the owner.
 export const postsRouter = Router();
@@ -36,6 +37,13 @@ postsRouter.get("/:id", async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
   res.json(await run(() => getFullPost(me.id, id)));
+});
+
+// Preview: the owner's profile and the grid around this post.
+postsRouter.get("/:id/preview", async (req, res) => {
+  const me = currentUser(req);
+  const { id } = idParam.parse(req.params);
+  res.json(await run(() => postPreview(me.id, id)));
 });
 
 const patchBody = z.object({
