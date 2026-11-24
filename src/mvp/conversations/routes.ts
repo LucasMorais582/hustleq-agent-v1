@@ -63,6 +63,7 @@ router.post("/", async (req, res) => {
     emptyDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     campaignFor: z.string().min(1).max(60).optional(),
     fromNote: z.string().uuid().optional(),
+    bare: z.boolean().optional(), // floating Duke: no opening message, the owner writes first
   }).parse(req.body ?? {});
   // Duke opens with the context the owner came from: an empty day (10.4), a commercial date (7.1) or a note (8.5).
   const opening = body.emptyDay ? await emptyDayOpening(me.id, body.emptyDay)
@@ -70,12 +71,42 @@ router.post("/", async (req, res) => {
     : body.fromNote ? await noteOpening(me.id, me.timezone, body.fromNote)
     : null;
   const conv = await db.conversation.create({ data: { userId: me.id, title: body.title ?? opening?.title ?? null } });
+  if (body.bare) { res.status(201).json(conv); return; }
   // 4.0b: Duke opens the conversation.
   const text = opening?.text ?? "New conversation. What do you want to work on?";
   const display = opening ? { text, card: opening.card, replies: opening.replies } : { text, replies: { options: ["Plan next week", "A post idea", "A campaign", "Ask a question"] } };
   const content = opening ? `(App note, not shown to the owner: ${opening.note})\n${text}` : text;
   await db.message.create({ data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text: content }], display } });
   res.status(201).json(conv);
+});
+
+// Floating Duke: the chat a screen came from (the post's week, campaign or chat; the campaign's;
+// the strategy's). Screens with no chat get a title for a new one, created on the first message.
+const SCREEN_NAME: Record<string, string> = {
+  home: "Home", calendar: "Calendar", post: "Post", campaign: "Campaign", campaigns: "Campaigns", strategy: "Strategy", strategies: "Strategies",
+  note: "Note", notes: "Notes", week: "Week", dates: "Commercial dates", settings: "Settings", more: "More", explore: "Explore", analytics: "Analytics",
+};
+
+router.get("/origin", async (req, res) => {
+  const me = currentUser(req);
+  const q = z.object({ screen: z.string().max(30), id: z.string().uuid().optional() }).parse(req.query);
+  let conversationId: string | null = null;
+  if (q.id) {
+    if (q.screen === "post") {
+      const p = await db.post.findFirst({ where: { id: q.id, userId: me.id }, select: { conversationId: true, week: { select: { conversationId: true } }, campaign: { select: { conversationId: true } } } });
+      conversationId = p?.conversationId ?? p?.campaign?.conversationId ?? p?.week?.conversationId ?? null;
+    } else if (q.screen === "campaign") {
+      conversationId = (await db.campaign.findFirst({ where: { id: q.id, userId: me.id }, select: { conversationId: true } }))?.conversationId ?? null;
+    } else if (q.screen === "strategy") {
+      conversationId = (await db.strategy.findFirst({ where: { id: q.id, userId: me.id }, select: { conversationId: true } }))?.conversationId ?? null;
+    } else if (q.screen === "week") {
+      conversationId = (await db.week.findFirst({ where: { id: q.id, userId: me.id }, select: { conversationId: true } }))?.conversationId ?? null;
+    }
+  }
+  // The chat may have been deleted since.
+  if (conversationId && !(await db.conversation.findFirst({ where: { id: conversationId, userId: me.id }, select: { id: true } }))) conversationId = null;
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: me.timezone, month: "short", day: "numeric", year: "numeric" }).format(new Date());
+  res.json({ conversationId, title: `From ${SCREEN_NAME[q.screen] ?? "HustleQ"} - ${day}` });
 });
 
 router.get("/:id", async (req, res) => {
@@ -117,7 +148,10 @@ const activeTurns = new Set<string>();
 router.post("/:id/messages", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
-  const { text } = z.object({ text: z.string().trim().min(1).max(4000) }).parse(req.body);
+  const { text, screen } = z.object({
+    text: z.string().trim().min(1).max(4000),
+    screen: z.object({ screen: z.string().max(30), id: z.string().max(60).optional(), label: z.string().max(120).optional() }).optional(),
+  }).parse(req.body);
   await ownConversation(me.id, id);
   if (activeTurns.has(id)) throw new AppError(409, "busy", "Duke is still answering the last message.");
 
@@ -135,7 +169,7 @@ router.post("/:id/messages", requireActivePlan, async (req, res) => {
       status: (label) => send("status", { label }),
       card: (card) => send("card", { card }),
       replies: (options) => send("replies", { options }),
-    }, controller.signal);
+    }, controller.signal, screen);
     send("done", {});
   } catch (error) {
     const timedOut = error instanceof Error && (error.name === "AbortError" || /abort/i.test(error.message));

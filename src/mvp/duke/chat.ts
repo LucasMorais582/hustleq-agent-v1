@@ -69,6 +69,8 @@ async function contextBlock(userId: string, user: { timezone: string; instagramH
 
 const STATUS: Record<string, string> = {
   get_business_profile: "Reading your Business Profile…",
+  get_post: "Reading the post…",
+  propose_post_update: "Writing the change…",
   get_instagram_summary: "Reading your Instagram…",
   list_strategies: "Looking at your strategies…",
   draft_strategy: "Building your strategy…",
@@ -89,7 +91,22 @@ function withoutThinking(content: StoredContent): Anthropic.ContentBlockParam[] 
   return (content as Anthropic.ContentBlockParam[]).filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking");
 }
 
-export async function runDukeTurn(userId: string, conversationId: string, userText: string, on: TurnEvents, signal?: AbortSignal) {
+// Where the owner is when they write from the floating Duke (any screen but the chat).
+export type ScreenContext = { screen: string; id?: string | undefined; label?: string | undefined };
+
+export function screenNote(ctx: ScreenContext) {
+  const what = ctx.label ? `"${ctx.label}"` : "";
+  const id = ctx.id ? ` (id ${ctx.id})` : "";
+  const subject = ctx.screen === "post" ? `the post ${what}${id}. "This post", "the caption", "it" mean this post`
+    : ctx.screen === "campaign" ? `the campaign ${what}${id}`
+    : ctx.screen === "strategy" ? `the strategy ${what}${id}`
+    : ctx.screen === "note" ? `the note ${what}${id}`
+    : ctx.screen === "calendar" ? `the Calendar${ctx.label ? `, ${ctx.label}` : ""}`
+    : `the ${ctx.screen} screen`;
+  return `(App note, not shown to the owner: they're writing from the floating Duke while looking at ${subject}.)`;
+}
+
+export async function runDukeTurn(userId: string, conversationId: string, userText: string, on: TurnEvents, signal?: AbortSignal, screen?: ScreenContext) {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId }, include: { business: true } });
   const history = await db.message.findMany({ where: { conversationId }, orderBy: { createdAt: "asc" }, select: { role: true, content: true } });
 
@@ -99,7 +116,9 @@ export async function runDukeTurn(userId: string, conversationId: string, userTe
   }));
   // Some conversations open with Duke (onboarding, "New conversation"); the API needs a user turn first.
   if (messages[0]?.role === "assistant") messages.unshift({ role: "user", content: "(The owner opened this conversation.)" });
-  messages.push({ role: "user", content: userText });
+  // From the floating Duke, the model also reads where the owner is; the app shows only their words.
+  const modelText = screen ? `${screenNote(screen)}\n${userText}` : userText;
+  messages.push({ role: "user", content: modelText });
 
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: DUKE_INSTRUCTIONS, cache_control: { type: "ephemeral" } },
@@ -184,7 +203,7 @@ export async function runDukeTurn(userId: string, conversationId: string, userTe
   let tick = 0;
   const at = () => new Date(base + tick++);
   await db.$transaction(async (tx) => {
-    await tx.message.create({ data: { conversationId, role: "user", content: [{ type: "text", text: userText }], display: { text: userText }, createdAt: at() } });
+    await tx.message.create({ data: { conversationId, role: "user", content: [{ type: "text", text: modelText }], display: { text: userText }, createdAt: at() } });
     for (const r of rows) {
       await tx.message.create({ data: { conversationId, role: r.role, content: r.content as object, createdAt: at(), ...(r.display ? { display: r.display as object } : {}) } });
     }

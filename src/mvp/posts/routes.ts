@@ -55,6 +55,7 @@ const patchBody = z.object({
   hashtags: z.array(z.string().max(80)).max(30).optional(),
   note: z.string().max(1000).nullable().optional(),
   title: z.string().trim().min(1).max(120).optional(),
+  slides: z.array(z.object({ shows: z.string().max(400), text: z.string().max(400), howToShoot: z.string().max(400) })).max(20).optional(),
 });
 
 postsRouter.patch("/:id", async (req, res) => {

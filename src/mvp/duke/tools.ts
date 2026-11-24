@@ -366,7 +366,7 @@ const TOOLS: ToolDef[] = [
       return heavy(ctx, async () => {
         const { noteId, campaignId, ...fields } = input;
         const post = await createDraftPost(ctx.userId, ctx.timezone, fields);
-        if (campaignId) await db.post.update({ where: { id: post.id }, data: { campaignId } });
+        await db.post.update({ where: { id: post.id }, data: { conversationId: ctx.conversationId, ...(campaignId ? { campaignId } : {}) } });
         if (noteId) await db.note.update({ where: { id: noteId }, data: { postId: post.id } });
         ctx.emitCard({ type: "post", postId: post.id });
         return { postId: post.id, status: "draft", note: "Card shown with Open post. It's a Draft until the owner schedules it on the post page." };
@@ -464,6 +464,61 @@ const TOOLS: ToolDef[] = [
     async run(input: { query?: string }, ctx) {
       const notes = await listNotes(ctx.userId, ctx.timezone, input.query);
       return { notes: notes.slice(0, 10).map((n) => ({ noteId: n.id, title: n.title, text: n.text.slice(0, 400), turnedIntoPost: Boolean(n.postId) })) };
+    },
+  },
+  {
+    tool: {
+      name: "get_post",
+      description: "Read one post in full: date and time, format, status, title, caption, hashtags, the owner's note, carousel slides and posting reminders. Use before suggesting changes to a post, especially the one the owner is looking at.",
+      input_schema: { type: "object", properties: { postId: { type: "string" } }, required: ["postId"], additionalProperties: false },
+    },
+    input: z.object({ postId: z.string().uuid() }),
+    async run(input: { postId: string }, ctx) {
+      const p = await db.post.findFirst({ where: { id: input.postId, userId: ctx.userId }, include: { pillar: true, campaign: { select: { name: true } } } });
+      if (!p) return { error: "Post not found." };
+      const when = p.scheduledAt ? new Intl.DateTimeFormat("en-US", { timeZone: ctx.timezone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(p.scheduledAt) : null;
+      const guidance = (p.productionGuidance ?? null) as { slides?: unknown[] } | null;
+      return {
+        postId: p.id, when, format: p.format, status: p.status, title: p.title, pillar: p.pillar?.name ?? null, campaign: p.campaign?.name ?? null,
+        caption: p.caption, hashtags: p.hashtags, note: p.note, slides: guidance?.slides ?? [], postingReminders: p.postingReminders,
+        editable: p.status !== "posted",
+      };
+    },
+  },
+  {
+    tool: {
+      name: "propose_post_update",
+      description: "Propose new text for one post: caption, hashtags, the owner's note or the carousel slides. The owner sees a card with the change and taps Apply; nothing changes until then. Read the post with get_post first. For day, time, format or title use revise_week_post instead.",
+      input_schema: {
+        type: "object",
+        properties: {
+          postId: { type: "string" },
+          caption: { type: "string", description: "The full new caption, in the business's voice, without hashtags" },
+          hashtags: { type: "array", items: { type: "string" }, description: "The full new list, each starting with #" },
+          note: { type: "string", description: "The full new note" },
+          slides: { type: "array", items: { type: "object", properties: { shows: { type: "string" }, text: { type: "string" }, howToShoot: { type: "string" } }, required: ["shows", "text", "howToShoot"], additionalProperties: false }, description: "Carousel only: every slide, in order" },
+          reason: { type: "string", description: "One short sentence the owner will read" },
+        },
+        required: ["postId", "reason"],
+        additionalProperties: false,
+      },
+    },
+    input: z.object({
+      postId: z.string().uuid(),
+      caption: z.string().min(1).max(2200).optional(),
+      hashtags: z.array(z.string().max(80)).max(30).optional(),
+      note: z.string().max(1000).optional(),
+      slides: z.array(z.object({ shows: z.string().max(400), text: z.string().max(400), howToShoot: z.string().max(400) })).max(20).optional(),
+      reason: z.string().max(300),
+    }),
+    async run(input: { postId: string; caption?: string; hashtags?: string[]; note?: string; slides?: { shows: string; text: string; howToShoot: string }[]; reason: string }, ctx) {
+      const p = await db.post.findFirst({ where: { id: input.postId, userId: ctx.userId }, select: { id: true, title: true, status: true } });
+      if (!p) return { error: "Post not found." };
+      if (p.status === "posted") return { error: "This post is already published, so it can't be changed." };
+      const { postId, reason, ...changes } = input;
+      if (!Object.keys(changes).length) return { error: "Nothing to change: give a caption, hashtags, note or slides." };
+      ctx.emitCard({ type: "post_update", postId, title: p.title, changes, reason });
+      return { shown_to_owner: true, note: "The owner sees a card with Apply. Nothing changed yet." };
     },
   },
 ];

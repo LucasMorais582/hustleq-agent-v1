@@ -72,7 +72,9 @@ export async function getFullPost(userId: string, id: string) {
   return p ? presentFullPost(p, user) : null;
 }
 
+export type SlidePatch = { shows: string; text: string; howToShoot: string };
 export type PostPatch = {
+  slides?: SlidePatch[] | undefined;
   date?: string | undefined;
   time?: string | undefined;
   format?: Format | undefined;
@@ -110,6 +112,8 @@ export async function updatePost(userId: string, tz: string, id: string, patch: 
   if (patch.hashtags !== undefined) data.hashtags = [...new Set(patch.hashtags.map((h) => h.trim()).filter(Boolean).map((h) => (h.startsWith("#") ? h : `#${h}`)))].slice(0, 30);
   if (patch.note !== undefined) data.note = patch.note?.trim() || null;
   if (patch.title !== undefined) data.title = patch.title.trim();
+  // Carousel slides live inside What to produce; replacing them keeps the rest of it.
+  if (patch.slides !== undefined) data.productionGuidance = { ...((p.productionGuidance as Record<string, unknown> | null) ?? {}), slides: patch.slides };
   await db.post.update({ where: { id }, data });
   return getFullPost(userId, id);
 }

@@ -345,6 +345,7 @@ model Post {
   weekId             String?
   pillarId           String?
   campaignId         String?
+  conversationId     String?    // the chat it was created in, for posts outside a week or campaign
   status             PostStatus @default(draft)
   scheduledAt        DateTime?
   format             String?    // reel | carousel | feed | story
