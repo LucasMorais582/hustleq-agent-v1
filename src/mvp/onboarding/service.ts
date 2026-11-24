@@ -133,10 +133,14 @@ function summaryText(analysis: Analysis, bundle: NonNullable<Awaited<ReturnType<
   return lines.join("\n");
 }
 
+const CUSTOMER_CHANNELS = ["Instagram", "Word of mouth", "Referrals", "Google / Maps", "Events and fairs", "Flyers and local media"];
+
 function questionDisplay(analysis: Analysis | null | undefined, index: number, first: boolean): Display {
   const field = PROFILE_FIELDS[index]!;
   const a = analysis?.fields?.[field.key];
-  const options = [...new Set([a?.guess, ...(a?.suggestions ?? [])].map((s) => s?.trim()).filter((s): s is string => Boolean(s)))].slice(0, 4);
+  const fromPosts = [...new Set([a?.guess, ...(a?.suggestions ?? [])].map((s) => s?.trim()).filter((s): s is string => Boolean(s)))].slice(0, 4);
+  // Where customers come from: a fixed list, offline channels included (posts only show online ones).
+  const options = field.key === "customerChannels" ? CUSTOMER_CHANNELS : fromPosts;
   const intro = first ? "Great. A few questions to finish your Business Profile. " : "";
   // The options already come from the posts; Duke just asks (no "I'd guess").
   return {
