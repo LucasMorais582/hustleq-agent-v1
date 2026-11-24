@@ -259,18 +259,22 @@ export async function createDraftPost(userId: string, tz: string, args: { date: 
 }
 
 export async function revisePost(userId: string, tz: string, postId: string, changes: PostChanges) {
-  const post = await db.post.findFirst({ where: { id: postId, userId }, include: { week: { include: { strategy: { include: { pillars: true } } } } } });
-  if (!post || !post.week) return null;
-  const weekStart = isoDate(post.week.startsOn)!;
+  const post = await db.post.findFirst({ where: { id: postId, userId }, include: { week: { include: { strategy: { include: { pillars: true } } } }, campaign: { select: { strategyId: true } } } });
+  if (!post) return null;
   const current = post.scheduledAt ? new Date(post.scheduledAt) : null;
+  // A week post moves inside its week; a campaign or single post inside the week it's in now.
+  const weekStart = post.week ? isoDate(post.week.startsOn)! : current ? mondayOf(current, tz) : null;
+  if (!weekStart) return null;
   const curDay = current ? DAYS[(new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(current)}T12:00:00Z`).getUTCDay() + 6) % 7]! : "Mon";
-  const curTime = current ? new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(current) : post.week.bestTime ?? "19:00";
+  const curTime = current ? new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(current) : post.week?.bestTime ?? "19:00";
+  const strategyId = post.week?.strategyId ?? post.campaign?.strategyId ?? null;
+  const pillars = post.week?.strategy?.pillars ?? (strategyId ? await db.pillar.findMany({ where: { strategyId } }) : []);
   const data: Record<string, unknown> = {};
   if (changes.day || changes.time) data.scheduledAt = scheduledAt(weekStart, changes.day ?? curDay, changes.time ?? curTime, tz);
   if (changes.format) { data.format = changes.format; data.contentType = contentTypeOf(changes.format); }
   if (changes.title) data.title = changes.title.slice(0, 120);
   if (changes.hook) data.hook = changes.hook.slice(0, 300);
-  if (changes.pillar) data.pillarId = post.week.strategy?.pillars.find((p) => p.name.toLowerCase() === changes.pillar!.toLowerCase())?.id ?? post.pillarId;
+  if (changes.pillar) data.pillarId = pillars.find((p) => p.name.toLowerCase() === changes.pillar!.toLowerCase())?.id ?? post.pillarId;
   // Only what changed the content needs new details; moving a post keeps them.
   const contentChanged = Boolean(changes.format || changes.title || changes.hook || changes.pillar);
   if (contentChanged) data.detailsStatus = "pending";

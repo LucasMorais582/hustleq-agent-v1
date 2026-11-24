@@ -137,7 +137,7 @@ function questionDisplay(analysis: Analysis | null | undefined, index: number, f
   const field = PROFILE_FIELDS[index]!;
   const a = analysis?.fields?.[field.key];
   const options = [...new Set([a?.guess, ...(a?.suggestions ?? [])].map((s) => s?.trim()).filter((s): s is string => Boolean(s)))].slice(0, 4);
-  const intro = first ? "Great. A few questions to finish your Business Profile. " : "Got it. ";
+  const intro = first ? "Great. A few questions to finish your Business Profile. " : "";
   // The options already come from the posts; Duke just asks (no "I'd guess").
   return {
     text: `${intro}${field.question}`,
