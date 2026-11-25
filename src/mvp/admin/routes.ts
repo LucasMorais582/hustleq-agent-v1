@@ -11,6 +11,8 @@ import { enqueueSafe } from "../jobs/queue.js";
 import { resetOnboardingForNewHandle } from "../onboarding/service.js";
 import { appUrl, sendEmail } from "../email/send.js";
 import { accountUpdatedEmail } from "../email/templates.js";
+import { releaseInvite, reserveForInvite, unlinkUser } from "../instagram/link.js";
+import { isApiMode } from "../socialData/index.js";
 import { expiresAtFor, instagramTaken, inviteToken, newInviteId, sendInviteEmail } from "../invites/service.js";
 
 // Admin is a role inside the app. Phase 1: invites (check the Instagram, reserve it, send).
@@ -21,11 +23,11 @@ const handleSchema = z.string().trim().toLowerCase().transform((h) => h.replace(
 
 // Lookups are slow (15-25 s with the demo source); keep them 10 minutes so "check" then "send" costs one.
 const lookups = new Map<string, { at: number; bundle: IgProfileBundle | null }>();
-async function lookup(handle: string) {
+async function lookup(handle: string, adminId: string) {
   const hit = lookups.get(handle);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.bundle;
   try {
-    const bundle = await socialData().lookupProfile(handle);
+    const bundle = await socialData(adminId).lookupProfile(handle);
     lookups.set(handle, { at: Date.now(), bundle });
     return bundle;
   } catch (error) {
@@ -40,7 +42,7 @@ async function audit(adminId: string, action: string, detail: object, targetUser
 
 router.post("/instagram-check", async (req, res) => {
   const { handle } = z.object({ handle: handleSchema }).parse(req.body);
-  const bundle = await lookup(handle);
+  const bundle = await lookup(handle, currentUser(req).id);
   if (!bundle) throw new AppError(404, "instagram_not_found", `We couldn't find @${handle} on Instagram.`);
   const taken = await instagramTaken(bundle.profile.id);
   res.json({ profile: bundle.profile, recentPosts: bundle.posts.length, source: bundle.source, taken });
@@ -63,13 +65,15 @@ router.post("/invites", async (req, res) => {
     throw new AppError(409, "invite_pending", "This email already has an open invite. Resend it instead.");
   }
 
-  const bundle = await lookup(body.handle);
+  const bundle = await lookup(body.handle, me.id);
   if (!bundle) throw new AppError(404, "instagram_not_found", `We couldn't find @${body.handle} on Instagram.`);
   const taken = await instagramTaken(bundle.profile.id);
   if (taken) throw new AppError(409, "instagram_taken", taken === "user" ? "This Instagram already belongs to an account." : "This Instagram already has an open invite.");
 
   const id = newInviteId();
   const createdAt = new Date();
+  // api mode: reserve the profile there first; its Initial Profile Sync starts right away.
+  const socialProfileId = await reserveForInvite(id, bundle.profile.handle, expiresAtFor(createdAt));
   const invite = await db.invite.create({
     data: {
       id,
@@ -77,6 +81,7 @@ router.post("/invites", async (req, res) => {
       businessName: body.businessName,
       instagramHandle: bundle.profile.handle,
       instagramProfileId: bundle.profile.id,
+      socialProfileId,
       tokenHash: hashToken(inviteToken(id)),
       createdAt,
       expiresAt: expiresAtFor(createdAt),
@@ -87,7 +92,8 @@ router.post("/invites", async (req, res) => {
   });
   const email = await sendInviteEmail(invite);
   // Initial Profile Sync: onboarding opens with the profile and posts already read.
-  await enqueueSafe("instagram-sync", { handle: invite.instagramHandle });
+  // (api mode: the API does it after the reservation; we can read it once the invite is accepted.)
+  if (!isApiMode()) await enqueueSafe("instagram-sync", { handle: invite.instagramHandle });
   await audit(me.id, "invite.create", { inviteId: invite.id, email: invite.email, handle: invite.instagramHandle });
   res.status(201).json({ invite: present(invite), emailStatus: email.status });
 });
@@ -119,6 +125,7 @@ router.post("/invites/:id/revoke", async (req, res) => {
   if (!invite) throw notFound("Invite not found.");
   if (invite.status !== "pending") throw new AppError(409, "invite_closed", "Only open invites can be revoked.");
   const updated = await db.invite.update({ where: { id }, data: { status: "revoked" } });
+  await releaseInvite(updated);
   await audit(me.id, "invite.revoke", { inviteId: id });
   res.json({ invite: present(updated) });
 });
@@ -208,7 +215,7 @@ router.post("/account-requests/:id/resolve", async (req, res) => {
   const request = await db.accountChangeRequest.findUnique({ where: { id } });
   if (!request || request.status !== "open") throw notFound("Request not found.");
 
-  const bundle = await lookup(handle);
+  const bundle = await lookup(handle, me.id);
   if (!bundle) throw new AppError(404, "instagram_not_found", `We couldn't find @${handle} on Instagram.`);
   const taken = await instagramTaken(bundle.profile.id);
   const owner = await db.user.findUnique({ where: { instagramProfileId: bundle.profile.id } });
@@ -219,6 +226,7 @@ router.post("/account-requests/:id/resolve", async (req, res) => {
     data: { instagramHandle: bundle.profile.handle, instagramProfileId: bundle.profile.id },
     include: { onboarding: true },
   });
+  await unlinkUser(user.id); // the next read reserves and links the new handle in the API
   await db.accountChangeRequest.update({ where: { id }, data: { status: "resolved", resolvedAt: new Date() } });
   await resetOnboardingForNewHandle(user.id, user.onboarding?.conversationId ?? null);
   await sendEmail(user.email, accountUpdatedEmail({ handle: bundle.profile.handle, url: appUrl("/onboarding") }), user.id);

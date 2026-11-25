@@ -1,5 +1,7 @@
 import { db } from "../db.js";
-import { socialData, type IgPost, type IgProfileBundle } from "../socialData/index.js";
+import { isApiMode, socialData, type IgPost, type IgProfileBundle } from "../socialData/index.js";
+import { ownBundle } from "../socialData/api.js";
+import { linkUser } from "./link.js";
 
 // The user's own Instagram, read through the Social Data adapter and kept for a day.
 // Synced when the invite is created, so onboarding (2.1, 2.2) opens with data.
@@ -11,10 +13,10 @@ export async function cachedInstagram(handle: string): Promise<IgProfileBundle |
   return row ? (row.data as unknown as IgProfileBundle) : null;
 }
 
-export async function syncInstagram(handle: string, { maxAgeMs = DAY } = {}) {
+export async function syncInstagram(handle: string, { maxAgeMs = DAY, waitMs = 150_000 } = {}) {
   const row = await db.instagramCache.findUnique({ where: { handle } });
   if (row && Date.now() - row.fetchedAt.getTime() < maxAgeMs) return row.data as unknown as IgProfileBundle;
-  const bundle = await socialData().lookupProfile(handle);
+  const bundle = isApiMode() ? await readFromApi(handle, waitMs) : await socialData().lookupProfile(handle);
   if (!bundle) return null;
   await db.instagramCache.upsert({
     where: { handle },
@@ -22,6 +24,24 @@ export async function syncInstagram(handle: string, { maxAgeMs = DAY } = {}) {
     create: { handle, profileId: bundle.profile.id, data: bundle as object, source: bundle.source },
   });
   return bundle;
+}
+
+// api mode: the API collects on its own (first sync at invite time, then every day at 4 AM New York);
+// we read what it stored. Only a user who owns the profile there can read it.
+async function readFromApi(handle: string, waitMs: number): Promise<IgProfileBundle | null> {
+  const user = await db.user.findFirst({ where: { instagramHandle: handle }, orderBy: { createdAt: "desc" }, select: { id: true } });
+  if (!user) return null; // invite not accepted yet: nothing we may read
+  const profileId = await linkUser(user.id);
+  if (!profileId) return null;
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    const read = await ownBundle(profileId, user.id);
+    if (read.syncStatus === "ready" || read.lastSyncedAt) return read.bundle; // a failed daily run keeps the last data
+    if (read.syncStatus === "failed") throw new Error(`Social Data API sync failed for @${handle}`);
+    // First sync still running over there (about 2 minutes after the invite).
+    if (Date.now() > deadline) throw new Error(`Social Data API still syncing @${handle}`);
+    await new Promise((r) => setTimeout(r, 10_000));
+  }
 }
 
 // Numbers Duke may quote: computed here, never by the model.

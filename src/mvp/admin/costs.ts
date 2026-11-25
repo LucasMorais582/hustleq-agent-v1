@@ -1,4 +1,17 @@
 import { db } from "../db.js";
+import { isApiMode } from "../socialData/index.js";
+import { sda } from "../socialData/api.js";
+
+// Apify cost from the Social Data API (endpoint 12). Null when it isn't connected or doesn't answer.
+async function apifyCosts(month: string) {
+  if (!isApiMode()) return null;
+  try {
+    return await sda.costs(month);
+  } catch (error) {
+    console.error("[costs] apify", error);
+    return null;
+  }
+}
 
 // Cost per account (phase 8): what each owner costs in Claude this month, by feature, with a
 // simple projection for the full month. Basis for the per-customer cost study.
@@ -54,6 +67,9 @@ export async function costReport(month: string) {
     };
   }).sort((a, b) => b.total - a.total);
 
+  const apify = await apifyCosts(month);
+  const apifyOf = (userId: string | null) => (apify && userId ? apify.byUser.find((u) => u.userId === userId)?.costUsd ?? 0 : null);
+
   const customers = accounts.filter((a) => a.kind === "paying" || a.kind === "managed");
   const total = accounts.reduce((s, a) => s + a.total, 0);
   return {
@@ -65,7 +81,10 @@ export async function costReport(month: string) {
     averagePerCustomer: customers.length ? round(customers.reduce((s, a) => s + a.total, 0) / customers.length, 2) : null,
     averageProjectedPerCustomer: customers.length ? round(customers.reduce((s, a) => s + a.projectedMonth, 0) / customers.length, 2) : null,
     features: Object.entries(byFeature).map(([feature, f]) => ({ feature, cost: round(f.cost, 4), calls: f.calls, avgPerCall: round(f.cost / f.calls, 4) })).sort((a, b) => b.cost - a.cost),
-    accounts,
-    note: "Claude only. Apify (Instagram data), Supabase, Resend and Railway are not in this report yet.",
+    accounts: accounts.map((a) => ({ ...a, apify: apifyOf(a.userId) })),
+    apify: apify ? { total: apify.totalUsd, unattributed: apify.unattributedUsd, byTrigger: apify.byTrigger } : null,
+    note: apify
+      ? "Claude and Apify (Instagram data). Supabase, Resend and Railway are not in this report yet."
+      : "Claude only. Apify (Instagram data), Supabase, Resend and Railway are not in this report yet.",
   };
 }

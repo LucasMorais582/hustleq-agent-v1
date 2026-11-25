@@ -32,6 +32,8 @@ model User {
   timezone           String    @default("America/New_York")
   instagramProfileId String?   @unique
   instagramHandle    String?
+  socialProfileId    String?   @unique // profile id in the Social Data API, set once we own it there
+  socialMonitoringUntil DateTime? // last value sent to the Social Data API (null = always collect)
   termsAcceptedAt    DateTime?
   termsVersion       String?
   billingExempt      Boolean   @default(false)  // accounts the HustleQ team manages (FPP): always active, no Stripe
@@ -94,6 +96,7 @@ model Invite {
   businessName       String
   instagramHandle    String
   instagramProfileId String?
+  socialProfileId    String?      // reserved in the Social Data API for this invite
   firstAccess        Boolean      @default(false) // Duke First Access: first month free
   billingExempt      Boolean      @default(false) // managed by the HustleQ team: no Stripe
   tokenHash          String       @unique

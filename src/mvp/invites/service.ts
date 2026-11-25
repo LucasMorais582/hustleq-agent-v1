@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { db } from "../db.js";
 import { appUrl, sendEmail, WAITLIST_URL } from "../email/send.js";
 import { inviteEmail, inviteExpiredEmail, inviteLastDayEmail, inviteReminderEmail } from "../email/templates.js";
+import { releaseInvite } from "../instagram/link.js";
 import { addDays, dayInTz, daysBetween, shortDate, zonedTime } from "../lib/time.js";
 
 // Invites last 7 days (day 1 = the day it was sent) and expire at the end of day 7, New York time.
@@ -60,6 +61,7 @@ export async function runInviteDaily(now = new Date(), onlyIds?: string[]) {
   for (const invite of pending) {
     if (invite.expiresAt <= now) {
       await db.invite.update({ where: { id: invite.id }, data: { status: "expired" } });
+      await releaseInvite(invite);
       await sendEmail(invite.email, inviteExpiredEmail({ businessName: invite.businessName, waitlistUrl: WAITLIST_URL }), invite.id);
       result.expired += 1;
       continue;
