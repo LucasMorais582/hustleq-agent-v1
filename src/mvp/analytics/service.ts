@@ -26,6 +26,9 @@ export async function ctx(userId: string): Promise<Ctx> {
   try {
     profileId = await linkUser(userId);
   } catch (error) {
+    // The handle isn't on Instagram (or is private): about the account, not a post.
+    if (error instanceof SocialDataApiError && (error.status === 404 || error.status === 403))
+      throw new AppError(404, "instagram_not_found", `We couldn't find @${user.instagramHandle ?? ""} on Instagram. Check your handle in Settings.`);
     throw unavailable(error);
   }
   if (!profileId) throw new AppError(409, "instagram_missing", "Add your Instagram first.");
