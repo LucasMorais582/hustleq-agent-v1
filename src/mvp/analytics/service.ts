@@ -17,9 +17,9 @@ const EARLY_DAYS = 14; // before 2 weeks of history: show the last 12 posts (11.
 const BADGE_FROM = 1.5; // "N× usual" from 1.5×
 const FORMAT_LABEL: Record<string, string> = { reel: "Reel", carousel: "Carousel", image: "Feed post" };
 
-type Ctx = { userId: string; tz: string; profileId: string; joinedDay: string; planActive: boolean };
+export type Ctx = { userId: string; tz: string; profileId: string; joinedDay: string; planActive: boolean };
 
-async function ctx(userId: string): Promise<Ctx> {
+export async function ctx(userId: string): Promise<Ctx> {
   if (!isApiMode()) throw new AppError(503, "analytics_unavailable", "Analytics needs the Instagram data connection, which isn't on here.");
   const user = await db.user.findUniqueOrThrow({ where: { id: userId }, include: { subscription: true } });
   let profileId: string | null;
@@ -85,7 +85,7 @@ async function postsIn(c: Ctx, q: { from?: string; to?: string; type?: "IMAGE" |
 }
 
 // The number a post is judged by: views for Reels, likes otherwise (comments when likes are hidden).
-function score(p: ApiPost): { metric: "views" | "likes" | "comments"; value: number | null } {
+export function score(p: ApiPost): { metric: "views" | "likes" | "comments"; value: number | null } {
   const m = p.metrics;
   if (p.type === "REEL" && m?.viewsCount != null) return { metric: "views", value: m.viewsCount };
   if (m?.likesHidden) return { metric: "comments", value: m.commentsCount };
@@ -93,7 +93,7 @@ function score(p: ApiPost): { metric: "views" | "likes" | "comments"; value: num
 }
 
 type Averages = Map<string, number>; // key `${format}:${metric}`
-function averages(base: ApiPost[]): Averages {
+export function averages(base: ApiPost[]): Averages {
   const sums = new Map<string, { total: number; n: number }>();
   for (const p of base) {
     const f = toFormat(p.type);
@@ -113,7 +113,7 @@ function averages(base: ApiPost[]): Averages {
   return new Map([...sums].filter(([, s]) => s.n >= 3).map(([k, s]) => [k, s.total / s.n]));
 }
 
-function ratioOf(p: ApiPost, avg: Averages) {
+export function ratioOf(p: ApiPost, avg: Averages) {
   const s = score(p);
   const base = avg.get(`${toFormat(p.type)}:${s.metric}`);
   if (s.value == null || !base) return null;
@@ -188,7 +188,7 @@ export type PostCard = Awaited<ReturnType<typeof cards>>[number];
 const lines = new Map<string, string>();
 // `withDuke` false: return only a line already cached (the app asks again with it on, so the
 // numbers show at once and Duke's line arrives a few seconds later).
-async function dukeLine(userId: string, key: string, instruction: string, facts: object, withDuke = true) {
+export async function dukeLine(userId: string, key: string, instruction: string, facts: object, withDuke = true) {
   const k = `${userId}|${key}|${new Date().toISOString().slice(0, 10)}`;
   const hit = lines.get(k);
   if (hit || !withDuke) return hit ?? null;
@@ -376,6 +376,9 @@ export async function refreshPost(userId: string, postId: string) {
 
 // ---------- 11.3 Compare ----------
 
+// Growth goes to Duke as "-0.3%" text, so it can't be read as a fraction.
+const pct = <T extends { followerGrowth: number | null }>(s: T) => ({ ...s, followerGrowth: s.followerGrowth == null ? null : `${s.followerGrowth}%` });
+
 export async function compare(userId: string, input: PeriodInput, withDuke = true) {
   const c = await ctx(userId);
   return guard(async () => {
@@ -409,7 +412,7 @@ export async function compare(userId: string, input: PeriodInput, withDuke = tru
       }
     }
     const comment = accounts.length
-      ? await dukeLine(userId, `compare:${per.from}:${per.to}`, "Compare the owner with the watched accounts in one or two sentences and suggest one thing to try.", { you, accounts: accounts.map((a) => ({ handle: a.handle, label: a.label, ...a.stats })) }, withDuke)
+      ? await dukeLine(userId, `compare:${per.from}:${per.to}`, "Compare the owner with the watched accounts in one or two sentences and suggest one thing to try.", { you: pct(you), accounts: accounts.map((a) => ({ handle: a.handle, label: a.label, ...(a.stats ? pct(a.stats) : {}) })) }, withDuke)
       : null;
     return { period: { ...per, label: input.from ? "custom" : `${per.days}d` }, you, accounts, comment };
   });

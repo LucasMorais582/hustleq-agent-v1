@@ -334,8 +334,10 @@ export async function announceTodayPosts(userId: string, tz: string, now = new D
   });
   const text = fresh.length === 1 ? lines[0]! : `You have ${fresh.length} posts today.\n\n${lines.join("\n\n")}`;
 
-  let conv = await db.conversation.findFirst({ where: { userId, OR: [{ objectType: null }, { objectType: { not: "onboarding" } }] }, orderBy: { updatedAt: "desc" }, select: { id: true } });
-  if (!conv) conv = await db.conversation.create({ data: { userId, title: "Today's post" }, select: { id: true } });
+  // All post-day reminders live in one conversation of their own, so they don't mix with other topics
+  // and don't create a new chat every day.
+  let conv = await db.conversation.findFirst({ where: { userId, objectType: "reminders" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  if (!conv) conv = await db.conversation.create({ data: { userId, title: "Post reminders", objectType: "reminders" }, select: { id: true } });
   const display = { text, cards: fresh.map((p) => ({ type: "post", postId: p.id })), replies: { options: ["I posted it", "Move it to another day"] }, todayPostIds: fresh.map((p) => p.id) };
   const note = "the app reminded the owner of today's post. If they say they posted it, thank them briefly and say you'll find it on their profile tomorrow and add it to their numbers. If they want to move it, use revise_week_post.";
   await db.message.create({ data: { conversationId: conv.id, role: "assistant", content: [{ type: "text", text: `(App note, not shown to the owner: ${note})\n${text}` }], display } });

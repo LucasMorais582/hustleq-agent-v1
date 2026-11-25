@@ -554,6 +554,8 @@ model SavedPost {
   id              String   @id @default(uuid())
   userId          String
   instagramPostId String
+  source          String   @default("explore") // explore | watched | own
+  data            Json?    // the post as shown when saved (Discover results expire)
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

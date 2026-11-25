@@ -14,6 +14,7 @@ import { notesRouter } from "./notes/routes.js";
 import { billingRouter, billingWebhook } from "./billing/routes.js";
 import { exportsRouter, filesRouter, productionRouter, sharedRouter, shotItemsRouter } from "./production/routes.js";
 import { analyticsRouter } from "./analytics/routes.js";
+import { exploreRouter } from "./explore/routes.js";
 import { errorHandler } from "./http/errors.js";
 
 // Everything the MVP app calls lives under /v1, with its own CORS list (APP_ORIGINS).
@@ -46,6 +47,7 @@ export function mvpRouter() {
   router.use("/files", filesRouter);
   router.use("/posts", postsRouter);
   router.use("/analytics", analyticsRouter);
+  router.use("/explore", exploreRouter);
 
   router.use((_req, res) => {
     res.status(404).json({ error: { code: "not_found", message: "Not found.", time: new Date().toISOString() } });

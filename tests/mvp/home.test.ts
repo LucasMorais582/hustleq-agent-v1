@@ -148,3 +148,25 @@ describe("is this the post you planned? (6.4)", () => {
     expect((await request(app).patch(`/v1/posts/${post.id}`).set(auth(o.token)).send({ date: d })).status).toBe(400); // posted can't move
   });
 });
+
+describe("post-day reminder in chat", () => {
+  it("goes to one 'Post reminders' conversation, once per post", async () => {
+    const o = await owner({ strategy: false });
+    const other = await db.conversation.create({ data: { userId: o.user.id, title: "Week plan" } });
+    const post = await createDraftPost(o.user.id, TZ, { date: today(), time: "23:30", format: "feed", title: "Samba night" });
+    await db.post.update({ where: { id: post.id }, data: { status: "scheduled" } });
+
+    const first = await request(app).post("/v1/home/today-message").set(auth(o.token));
+    expect(first.body.conversationId).toBeTruthy();
+    expect(first.body.conversationId).not.toBe(other.id);
+    const conv = await db.conversation.findUniqueOrThrow({ where: { id: first.body.conversationId } });
+    expect(conv).toMatchObject({ title: "Post reminders", objectType: "reminders" });
+
+    expect((await request(app).post("/v1/home/today-message").set(auth(o.token))).body.conversationId).toBeNull();
+
+    const second = await createDraftPost(o.user.id, TZ, { date: today(), time: "23:45", format: "reel", title: "Caipirinha reel" });
+    await db.post.update({ where: { id: second.id }, data: { status: "scheduled" } });
+    expect((await request(app).post("/v1/home/today-message").set(auth(o.token))).body.conversationId).toBe(conv.id);
+    expect(await db.conversation.count({ where: { userId: o.user.id, objectType: "reminders" } })).toBe(1);
+  });
+});
