@@ -38,6 +38,11 @@ export async function postPreview(userId: string, postId: string) {
     handle: user.instagramHandle,
     name: bundle?.profile.name ?? user.business?.businessName ?? null,
     photoUrl: bundle?.profile.photoUrl ?? null,
+    // The profile header as people see it above the grid.
+    bio: bundle?.profile.bio ?? null,
+    posts: bundle?.profile.totalPosts ?? null,
+    followers: bundle?.profile.followers ?? null,
+    following: bundle?.profile.following ?? null,
     grid: [...planned, ...published],
   };
 }

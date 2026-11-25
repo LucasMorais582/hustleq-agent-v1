@@ -1,3 +1,4 @@
+import { reviewInvite } from "../review/service.js";
 import { db } from "../db.js";
 import { cachedInstagram } from "../instagram/own.js";
 import { addDays, dayInTz, zonedTime } from "../lib/time.js";
@@ -204,6 +205,7 @@ export async function getHome(userId: string, which: "this" | "next") {
     stale: staleNotice(bundle, cacheRow?.fetchedAt ?? null, tz),
     match: which === "this" ? await findMatch(userId, tz, user.instagramHandle) : null,
     suggestion: which === "this" ? await campaignSuggestion(userId, tz) : null,
+    review: which === "this" ? await reviewInvite(userId) : null,
   };
 }
 

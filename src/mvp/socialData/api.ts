@@ -95,8 +95,8 @@ export type ApiProfile = {
 };
 export type Ownership = "available" | "owned_by_me" | "owned_by_other" | "reserved" | "not_found";
 type SearchResult =
-  | { username: string; ownershipStatus: "not_found" }
-  | { instagramId: string; username: string; name: string | null; bio: string | null; profilePhoto: string | null; isVerified: boolean | null; followers: number | null; following: number | null; postsCount: number | null; ownershipStatus: Exclude<Ownership, "not_found"> };
+  | { profileId: null; username: string; ownershipStatus: "not_found" }
+  | { profileId: string | null; instagramId: string; username: string; name: string | null; bio: string | null; profilePhoto: string | null; isVerified: boolean | null; followers: number | null; following: number | null; postsCount: number | null; ownershipStatus: Exclude<Ownership, "not_found"> };
 export type DiscoverPost = {
   instagramPostId: string;
   url: string | null;
@@ -173,7 +173,7 @@ export const sda = {
       totalPosts: data.postsCount,
       photoUrl: data.profilePhoto,
     };
-    return { profile, ownership: data.ownershipStatus };
+    return { profile, ownership: data.ownershipStatus, profileId: data.profileId ?? null };
   },
   // 2. Reserve the profile for an invite; starts the Initial Profile Sync over there.
   async reserve(handle: string, inviteId: string, reservedUntil: Date) {
@@ -188,6 +188,11 @@ export const sda = {
     await call("POST", `/internal/instagram/profiles/${enc(profileId)}/owner`, "service", { body: { userId } });
   },
   // 4. Invite expired or revoked: free the reservation, keep the data.
+  // Ends the user's ownership: the API ends their watched list and cancels pending syncs there.
+  // A profile without owner answers 204 too; another owner answers 409 OWNER_MISMATCH.
+  async removeOwner(profileId: string, userId: string) {
+    await call("DELETE", `/internal/instagram/profiles/${enc(profileId)}/owner`, "service", { query: { userId } });
+  },
   async releaseReservation(profileId: string) {
     await call("DELETE", `/internal/instagram/profiles/${enc(profileId)}/reservation`, "service");
   },
@@ -232,9 +237,10 @@ export const sda = {
   async endCompetitor(profileId: string, userId: string, relationId: string) {
     await call("DELETE", `/instagram/profiles/${enc(profileId)}/competitors/${enc(relationId)}`, { userId });
   },
-  // 16. A cache miss waits for the search over there (can take minutes): call it from a job.
-  async discover(q: { niche: string; city: string; query?: string | null }, caller: Caller, timeoutMs = 300_000) {
-    return (await call<Discover>("GET", "/instagram/discover", caller, { query: { niche: q.niche, city: q.city, query: q.query ?? undefined }, timeoutMs })).data;
+  // 16. Cached (24 h there) -> 200 with posts. A miss queues the search over there and answers
+  // 202 {status: "searching"}; ask again until the posts arrive. A failure in the last minute is an error.
+  async discover(q: { niche: string; city: string; query?: string | null }, caller: Caller): Promise<Discover | { status: "searching" }> {
+    return (await call<Discover | { status: "searching" }>("GET", "/instagram/discover", caller, { query: { niche: q.niche, city: q.city, query: q.query ?? undefined }, timeoutMs: 60_000 })).data;
   },
   // 12.
   async costs(month: string) {

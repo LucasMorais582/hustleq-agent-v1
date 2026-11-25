@@ -9,6 +9,7 @@ import { SocialDataUnavailable } from "../../src/mvp/socialData/types.js";
 
 const SECRET = "x".repeat(40);
 let server: Server;
+let discoverCalls = 0;
 const seen: { method: string; path: string; claims: jwt.JwtPayload; body: string }[] = [];
 
 const post = (id: string, type: "REEL" | "IMAGE", likes: number | null) => ({
@@ -40,6 +41,7 @@ beforeAll(async () => {
           ? send(409, { error: { code: "PROFILE_ALREADY_OWNED", message: "x", time: new Date().toISOString() } })
           : send(201, { profileId: "cprof1", username: "bargoyana", status: "syncing" });
       }
+      if (p === "/internal/instagram/profiles/cprof1/owner" && req.method === "DELETE") return send(204);
       if (p === "/internal/instagram/profiles/cprof1/owner") return send(200, { profileId: "cprof1", ownerUserId: JSON.parse(body).userId });
       if (p === "/internal/instagram/profiles/cprof1/reservation") return send(204);
       if (p === "/instagram/profiles/cprof1") {
@@ -51,6 +53,12 @@ beforeAll(async () => {
       if (p === "/instagram/posts/p1/refresh") return send(429, { error: { code: "MANUAL_REFRESH_LIMIT_REACHED", message: "x", time: new Date().toISOString() } });
       if (p === "/instagram/profiles/cprof1/competitors") return send(200, { response: { relations: [], page: 1, limit: 50 } });
       if (p === "/internal/costs") return send(200, { month: "2026-11", totalUsd: 0.12, byUser: [{ userId: "u1", costUsd: 0.1, runs: 4 }], byTrigger: [], unattributedUsd: 0.02 });
+      if (p === "/instagram/discover" && url.searchParams.get("niche") === "cocktail bar") {
+        discoverCalls += 1;
+        return discoverCalls === 1
+          ? send(202, { status: "searching" })
+          : send(200, { fromCache: true, fetchedAt: "2026-11-25T18:00:00.000Z", niche: "cocktail bar", city: "New York", query: null, posts: [] });
+      }
       if (p === "/instagram/discover") return send(503, { error: { code: "PROVIDER_UNAVAILABLE", message: "x", time: new Date().toISOString() } });
       send(404, { error: { code: "NOT_FOUND", message: "x", time: new Date().toISOString() } });
     });
@@ -102,5 +110,16 @@ describe("Social Data API client (api mode)", () => {
     expect(await sda.post("p2", "u1")).toMatchObject({ refreshing: false, post: { id: "p2" } });
     expect(await sda.competitors("cprof1", "u1")).toEqual([]);
     expect(await sda.costs("2026-11")).toMatchObject({ totalUsd: 0.12 });
+  });
+
+  it("removes the owner with the user id in the query", async () => {
+    await sda.removeOwner("cprof1", "u1");
+    expect(seen.at(-1)).toMatchObject({ method: "DELETE", path: "/api/v1/internal/instagram/profiles/cprof1/owner?userId=u1" });
+    expect(seen.at(-1)!.claims).toMatchObject({ sub: "hustleq-main", scope: "service" });
+  });
+
+  it("gets 202 searching on a Discover miss, then the posts", async () => {
+    expect(await sda.discover({ niche: "cocktail bar", city: "New York" }, { userId: "u1" })).toEqual({ status: "searching" });
+    expect(await sda.discover({ niche: "cocktail bar", city: "New York" }, { userId: "u1" })).toMatchObject({ fromCache: true, posts: [] });
   });
 });

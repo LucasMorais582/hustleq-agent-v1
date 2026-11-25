@@ -46,6 +46,7 @@ router.get("/", async (req, res) => {
     let linked: string | null = null;
     if (c.objectType === "onboarding") linked = "Business Profile";
     if (c.objectType === "reminders") linked = "Your post-day reminders";
+    if (c.objectType === "review") linked = "Monthly review";
     if (c.objectType === "strategy") linked = `Strategy · ${strategies.find((s) => s.id === c.objectId)?.title ?? ""}`;
     if (c.objectType === "campaign") linked = `Campaign · ${campaigns.find((x) => x.id === c.objectId)?.name ?? ""}`;
     if (c.objectType === "week") {

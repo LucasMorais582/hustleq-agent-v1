@@ -214,6 +214,18 @@ export async function dukeLine(userId: string, key: string, instruction: string,
   }
 }
 
+// How far back the account's numbers go. Instagram keeps no follower history we can read, so it
+// starts at our first daily count; the app only offers periods that fit in it.
+export async function history(userId: string) {
+  const c = await ctx(userId);
+  return guard(async () => {
+    const snaps = await sda.snapshots(c.profileId, c.userId);
+    const today = dayInTz(new Date(), c.tz);
+    const start = snaps[0] ? dayInTz(new Date(snaps[0].collectedAt), c.tz) : today;
+    return { historyStart: start, today, days: daysBetween(start, today) + 1, joinedDay: c.joinedDay };
+  });
+}
+
 // ---------- 11.1, 11.2, 11.4 Overview ----------
 
 function followersIn(snaps: ApiProfileSnapshot[], tz: string) {
@@ -237,7 +249,9 @@ export async function overview(userId: string, input: PeriodInput, withDuke = tr
     const series = followersIn(allSnaps.filter((s) => { const d = dayInTz(new Date(s.collectedAt), c.tz); return d >= per.from && d <= per.to; }), c.tz);
     const followersChange = series.length >= 2 ? series.at(-1)!.followers - series[0]!.followers : null;
 
-    const posts = early ? base.slice(0, 12) : await postsIn(c, { from: startOf(per.from, c.tz), to: endOf(per.to, c.tz) });
+    // Posts always follow the period (their dates come from Instagram). "early" (under 2 weeks of
+    // daily snapshots) only limits what needs history: the followers trend and comparisons.
+    const posts = await postsIn(c, { from: startOf(per.from, c.tz), to: endOf(per.to, c.tz) });
     const avg = averages(base);
     const sum = (f: (p: ApiPost) => number | null | undefined) => posts.reduce((s, p) => s + (f(p) ?? 0), 0);
     const byFormat = ["reel", "carousel", "image"].map((f) => {
@@ -249,16 +263,18 @@ export async function overview(userId: string, input: PeriodInput, withDuke = tr
     const weeks = Math.max(1, per.days / 7);
     const stats = {
       count: posts.length,
-      perWeek: early ? null : Math.round((posts.length / weeks) * 10) / 10,
+      perWeek: Math.round((posts.length / weeks) * 10) / 10,
       likes: sum((p) => (p.metrics?.likesHidden ? 0 : p.metrics?.likesCount)),
       comments: sum((p) => p.metrics?.commentsCount),
       views: sum((p) => p.metrics?.viewsCount),
       hiddenLikes: posts.filter((p) => p.metrics?.likesHidden).length,
     };
     const summary = await dukeLine(userId, `overview:${per.from}:${per.to}:${early}`, early
-      ? "History is still forming (under 2 weeks). Say what the last 12 posts show and that period comparisons come after 2 to 3 weeks."
+      ? "Follower history is still forming (under 2 weeks of daily numbers). Say what the posts of this period show; follower trends come after 2 to 3 weeks."
       : "Summarize how the account did in this period and what to keep doing.", {
-      period: `${per.from} to ${per.to}`, followers: profile.metrics?.followers ?? null, followersChange, posts: stats, byFormat,
+      period: `${per.from} to ${per.to}`, followers: profile.metrics?.followers ?? null, followersChange,
+      // Instagram has no follower history: we only count from our first snapshot.
+      followersChangeSince: series[0]?.day ?? null, posts: stats, byFormat,
       bestPost: best[0] ? { format: best[0].format, views: best[0].views, likes: best[0].likes, timesUsual: best[0].ratio } : null,
     }, withDuke);
     return {
@@ -415,5 +431,64 @@ export async function compare(userId: string, input: PeriodInput, withDuke = tru
       ? await dukeLine(userId, `compare:${per.from}:${per.to}`, "Compare the owner with the watched accounts in one or two sentences and suggest one thing to try.", { you: pct(you), accounts: accounts.map((a) => ({ handle: a.handle, label: a.label, ...(a.stats ? pct(a.stats) : {}) })) }, withDuke)
       : null;
     return { period: { ...per, label: input.from ? "custom" : `${per.days}d` }, you, accounts, comment };
+  });
+}
+
+// ---------- 12.0 · The month in numbers (monthly review) ----------
+
+const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Facts about one past month (from/to are days in the account's time zone), for Duke's analysis.
+// Numbers are computed here; the model only writes about them.
+export async function monthFacts(userId: string, from: string, to: string) {
+  const c = await ctx(userId);
+  return guard(async () => {
+    const [snaps, base, posts] = await Promise.all([
+      sda.snapshots(c.profileId, c.userId),
+      basePosts(c),
+      postsIn(c, { from: startOf(from, c.tz), to: endOf(to, c.tz) }),
+    ]);
+    // New followers: last count of the month minus the last one before it (or the first in it).
+    const series = followersIn(snaps, c.tz);
+    const before = [...series].filter((s) => s.day < from).at(-1) ?? series.find((s) => s.day >= from && s.day <= to);
+    const end = [...series].filter((s) => s.day <= to).at(-1);
+    const newFollowers = before && end && end.day > before.day ? end.followers - before.followers : null;
+    const avg = averages(base);
+    const local = (p: ApiPost) => (p.timestamp ? new Date(new Date(p.timestamp).toLocaleString("en-US", { timeZone: c.tz })) : null);
+    const ranked = [...posts].sort((a, b) => (ratioOf(b, avg) ?? 0) - (ratioOf(a, avg) ?? 0) || (score(b).value ?? 0) - (score(a).value ?? 0));
+    const links = await planLinks(userId, posts.map((p) => p.id));
+    const describe = (p: ApiPost) => {
+      const at = local(p);
+      const s = score(p);
+      return {
+        format: FORMAT_LABEL[toFormat(p.type)] ?? p.type,
+        firstLine: firstLine(p.caption),
+        [s.metric]: s.value,
+        comments: p.metrics?.commentsCount ?? null,
+        timesUsual: ratioOf(p, avg),
+        weekday: at ? WEEKDAY[at.getDay()] : null,
+        hour: at ? at.getHours() : null,
+        fromPlan: links.get(p.id)?.title ?? null,
+      };
+    };
+    const byFormat = ["reel", "carousel", "image"].map((f) => ({ format: FORMAT_LABEL[f]!, posts: posts.filter((p) => toFormat(p.type) === f).length })).filter((f) => f.posts > 0);
+    // Planned in the app vs posted (plan adherence).
+    const planned = await db.post.findMany({
+      where: { userId, status: { in: ["scheduled", "posted"] }, scheduledAt: { gte: new Date(startOf(from, c.tz)), lte: new Date(endOf(to, c.tz)) } },
+      select: { status: true },
+    });
+    return {
+      month: { from, to },
+      posts: posts.length,
+      newFollowers,
+      followersNow: end?.followers ?? null,
+      views: posts.reduce((s, p) => s + (p.metrics?.viewsCount ?? 0), 0),
+      likes: posts.reduce((s, p) => s + (p.metrics?.likesHidden ? 0 : p.metrics?.likesCount ?? 0), 0),
+      comments: posts.reduce((s, p) => s + (p.metrics?.commentsCount ?? 0), 0),
+      byFormat,
+      best: ranked.slice(0, 3).map(describe),
+      weakest: posts.length >= 6 ? ranked.slice(-2).map(describe) : [],
+      plan: { scheduledInApp: planned.length, confirmedPostedInApp: planned.filter((p) => p.status === "posted").length },
+    };
   });
 }

@@ -132,12 +132,15 @@ export async function regenerateSection(postId: string, section: Section) {
 
 // "New caption" on 6.1: a fresh caption for the owner to try. Not saved here: the app puts it in
 // the caption box (with Undo) and the owner saves the post as usual.
-export type CaptionStyle = "shorter" | "casual" | "direct";
+export type CaptionStyle = "shorter" | "casual" | "direct" | "hook";
 const STYLE_NOTE: Record<CaptionStyle, string> = {
   shorter: "Make it noticeably shorter than the current one: 1 or 2 short lines plus the call to action.",
   casual: "Make it more casual and relaxed, like the owner talking to regulars.",
   direct: "Make it more direct: lead with the offer or the reason to come, and a clear call to action.",
+  hook: "",
 };
+// Instagram shows about 125 characters (or 2 lines) before "more"; the hook has to fit there.
+const HOOK_FIRST = "Keep the current caption's content and voice. Rewrite only so the hook is the very first line and fits in under 100 characters, so it shows before Instagram's \"more\". Don't add new claims.";
 
 export async function writeCaption(postId: string, current: string | null, style?: CaptionStyle) {
   const post = await db.post.findUniqueOrThrow({ where: { id: postId }, include: { pillar: true } });
@@ -161,7 +164,9 @@ export async function writeCaption(postId: string, current: string | null, style
     {
       max_tokens: 2000,
       system: `${SYSTEM}\n- Write the caption in the business's own voice, never as Duke. No hashtags in the caption.`,
-      messages: [{ role: "user", content: `${brief}\n\nWrite a new caption for this post, clearly different from the current one.${style ? ` ${STYLE_NOTE[style]}` : ""}` }],
+      messages: [{ role: "user", content: style === "hook"
+        ? `${brief.replace("Current caption (the owner wants a different one):", "Current caption:")}\n\n${HOOK_FIRST}`
+        : `${brief}\n\nWrite a new caption for this post, clearly different from the current one.${style ? ` ${STYLE_NOTE[style]}` : ""}` }],
     },
     zodOutputFormat(z.object({ caption: DetailsSchema.shape.caption }))
   );

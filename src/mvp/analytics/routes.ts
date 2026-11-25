@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { currentUser, requireUser } from "../auth/middleware.js";
-import { compare, overview, publishedPost, refreshPost, yourPosts } from "./service.js";
+import { compare, history, overview, publishedPost, refreshPost, yourPosts } from "./service.js";
 
 // Analytics (11.1 to 11.7c): Overview, Your posts, Compare and the published post.
 export const analyticsRouter = Router();
@@ -16,6 +16,10 @@ const periodQuery = z.object({
 });
 // ?duke=0: numbers only (fast); the app then asks again with Duke's line.
 const withDuke = (q: unknown) => (q as { duke?: string }).duke !== "0";
+
+analyticsRouter.get("/history", async (req, res) => {
+  res.json(await history(currentUser(req).id));
+});
 
 analyticsRouter.get("/overview", async (req, res) => {
   res.json(await overview(currentUser(req).id, periodQuery.parse(req.query), withDuke(req.query)));

@@ -53,13 +53,45 @@ export async function linkUser(userId: string): Promise<string | null> {
   }
   await sda.assignOwner(profileId, userId);
   await db.user.update({ where: { id: userId }, data: { socialProfileId: profileId } });
+  await rewatch(userId, profileId);
   return profileId;
 }
 
-// Handle changed by the team ("Not my account"): the next read links the new profile.
-// The API has no way yet to drop the old owner (asked to Helio), so the old profile keeps syncing.
+// After a relink (new handle), the accounts the user watches are added again under the new profile:
+// removing the old owner ended them in the API. Kept here with their dates; failures are logged.
+async function rewatch(userId: string, profileId: string) {
+  const watched = await db.watchedAccount.findMany({ where: { userId } });
+  if (!watched.length) return;
+  let active: string[] = [];
+  try {
+    active = (await sda.competitors(profileId, userId)).map((r) => r.competitorProfileId);
+  } catch (error) {
+    console.error("[social] rewatch list failed", userId, error);
+    return;
+  }
+  for (const w of watched) {
+    if (active.includes(w.instagramProfileId)) continue;
+    try {
+      await sda.addCompetitor(profileId, userId, w.handle);
+    } catch (error) {
+      console.error("[social] rewatch failed", userId, w.handle, error);
+    }
+  }
+}
+
+// Handle changed by the team ("Not my account"): the old profile loses its owner in the API (it stops
+// syncing for us and its watched list ends there); the next read links the new profile.
 export async function unlinkUser(userId: string) {
   if (!isApiMode()) return;
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { socialProfileId: true } });
+  if (user.socialProfileId) {
+    try {
+      await sda.removeOwner(user.socialProfileId, userId);
+    } catch (error) {
+      // 404 (gone) or 409 (someone else owns it now): nothing of ours to remove.
+      if (!(error instanceof SocialDataApiError && (error.status === 404 || error.status === 409))) throw error;
+    }
+  }
   await db.user.update({ where: { id: userId }, data: { socialProfileId: null, socialMonitoringUntil: null } });
 }
 

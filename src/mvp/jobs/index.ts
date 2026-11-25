@@ -6,6 +6,7 @@ import { writePostDetails } from "../plan/details.js";
 import { JOB_SHOT_LIST, writeShotList } from "../production/shotList.js";
 import { runReminders } from "../posts/reminders.js";
 import { db } from "../db.js";
+import { runMonthlyReviews } from "../review/service.js";
 import { defineJob, defineSchedule } from "./queue.js";
 
 // Registry of every job.
@@ -18,6 +19,7 @@ export const JOBS = {
   shotList: JOB_SHOT_LIST, // what to film for a week (Claude)
   postReminders: "post-reminders", // 6.3 reminder emails, every 15 minutes
   instagramDaily: "instagram-daily", // own profile + recent posts for every owner, once a day (Home numbers, 6.4)
+  monthlyReview: "monthly-review", // 12.0: prepares each account's month analysis on day 1 (Message Batch) and collects it
   socialDataCron: "social-data-cron", // wakes the Social Data API's daily collection (it runs it once a day, 4 AM New York)
 } as const;
 
@@ -88,3 +90,10 @@ defineJob(JOBS.socialDataCron, async () => {
   else if (!body.includes('"skipped":true')) console.log("[jobs] social data cron", res.status, body.slice(0, 300));
 });
 defineSchedule(JOBS.socialDataCron, "*/10 * * * *", "UTC");
+
+// Hourly, so each account's day 1 starts in its own time zone; also collects the batch when it's back.
+defineJob(JOBS.monthlyReview, async () => {
+  const r = await runMonthlyReviews();
+  if (r.prepared || r.collected || r.direct) console.log("[jobs] monthly review", r);
+});
+defineSchedule(JOBS.monthlyReview, "5 * * * *", "UTC");

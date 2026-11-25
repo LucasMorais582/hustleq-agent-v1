@@ -25,22 +25,22 @@ enum Role {
 }
 
 model User {
-  id                 String    @id @default(uuid())
-  email              String    @unique
-  passwordHash       String
-  role               Role      @default(user)
-  timezone           String    @default("America/New_York")
-  instagramProfileId String?   @unique
-  instagramHandle    String?
-  socialProfileId    String?   @unique // profile id in the Social Data API, set once we own it there
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  passwordHash          String
+  role                  Role      @default(user)
+  timezone              String    @default("America/New_York")
+  instagramProfileId    String?   @unique
+  instagramHandle       String?
+  socialProfileId       String?   @unique // profile id in the Social Data API, set once we own it there
   socialMonitoringUntil DateTime? // last value sent to the Social Data API (null = always collect)
-  termsAcceptedAt    DateTime?
-  termsVersion       String?
-  billingExempt      Boolean   @default(false)  // accounts the HustleQ team manages (FPP): always active, no Stripe
-  remindersOn        Boolean   @default(true)   // email on post days (Account · Reminders)
-  reminderTime       String    @default("09:00") // when the reminder goes out, owner's timezone
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  termsAcceptedAt       DateTime?
+  termsVersion          String?
+  billingExempt         Boolean   @default(false) // accounts the HustleQ team manages (FPP): always active, no Stripe
+  remindersOn           Boolean   @default(true) // email on post days (Account · Reminders)
+  reminderTime          String    @default("09:00") // when the reminder goes out, owner's timezone
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   sessions        Session[]
   resetTokens     PasswordResetToken[]
@@ -96,7 +96,7 @@ model Invite {
   businessName       String
   instagramHandle    String
   instagramProfileId String?
-  socialProfileId    String?      // reserved in the Social Data API for this invite
+  socialProfileId    String? // reserved in the Social Data API for this invite
   firstAccess        Boolean      @default(false) // Duke First Access: first month free
   billingExempt      Boolean      @default(false) // managed by the HustleQ team: no Stripe
   tokenHash          String       @unique
@@ -139,10 +139,10 @@ model AdminAuditLog {
 model EmailLog {
   id         String   @id @default(uuid())
   to         String
-  template   String   // invite | invite_reminder | invite_last_day | invite_expired | password_reset
+  template   String // invite | invite_reminder | invite_last_day | invite_expired | password_reset
   subject    String
-  refId      String?  // invite id, user id...
-  status     String   // sent | logged | failed
+  refId      String? // invite id, user id...
+  status     String // sent | logged | failed
   providerId String?
   error      String?
   createdAt  DateTime @default(now())
@@ -177,7 +177,7 @@ model OnboardingState {
   step           Int       @default(1) // 1 Instagram, 2 summary, 3 questions, 4 review and first strategy
   status         String    @default("active") // active | paused (Not my account) | done
   conversationId String?
-  data           Json?     // analysis, current question, sub-state
+  data           Json? // analysis, current question, sub-state
   completedAt    DateTime?
   updatedAt      DateTime  @updatedAt
 
@@ -213,7 +213,7 @@ model Conversation {
   userId     String
   title      String?
   pinned     Boolean  @default(false)
-  objectType String?  // week | strategy | campaign | note | onboarding
+  objectType String? // week | strategy | campaign | note | onboarding | reminders | review
   objectId   String?
   summary    String?
   createdAt  DateTime @default(now())
@@ -229,7 +229,7 @@ model Conversation {
 model Message {
   id             String   @id @default(uuid())
   conversationId String
-  role           String   // user | assistant
+  role           String // user | assistant
   // Content blocks exactly as the Claude API returned them (thinking blocks included):
   // the history must go back append-only, or preserved thinking breaks.
   content        Json
@@ -248,7 +248,7 @@ model ToolCall {
   name           String
   input          Json
   output         Json?
-  status         String   // ok | blocked | error
+  status         String // ok | blocked | error
   durationMs     Int?
   createdAt      DateTime @default(now())
 
@@ -260,7 +260,7 @@ model ToolCall {
 model AiUsage {
   id               String   @id @default(uuid())
   userId           String?
-  feature          String   // chat | week_skeleton | post_details | ...
+  feature          String // chat | week_skeleton | post_details | ...
   model            String
   inputTokens      Int
   outputTokens     Int
@@ -280,7 +280,7 @@ model AiUsage {
 model Strategy {
   id             String    @id @default(uuid())
   userId         String
-  title          String    // the strategy's name, e.g. "Taste the Tradition"
+  title          String // the strategy's name, e.g. "Taste the Tradition"
   objective      String?
   durationWeeks  Int       @default(8)
   staticPerWeek  Int       @default(2) // feed posts and carousels
@@ -289,7 +289,7 @@ model Strategy {
   status         String    @default("draft") // draft | saved (active/ended comes from the dates)
   startsOn       DateTime? @db.Date
   endsOn         DateTime? @db.Date
-  conversationId String?   // where it was created ("Open conversation")
+  conversationId String? // where it was created ("Open conversation")
   summary        String?
   goals          Json?
   createdAt      DateTime  @default(now())
@@ -317,15 +317,15 @@ model Pillar {
 }
 
 model Week {
-  id         String   @id @default(uuid())
-  userId     String
-  strategyId String?
-  startsOn   DateTime @db.Date // Monday, in the owner's timezone
-  status     String   @default("draft") // draft | saved
-  bestTime   String?  // "19:00", from the last posts' engagement
+  id             String   @id @default(uuid())
+  userId         String
+  strategyId     String?
+  startsOn       DateTime @db.Date // Monday, in the owner's timezone
+  status         String   @default("draft") // draft | saved
+  bestTime       String? // "19:00", from the last posts' engagement
   conversationId String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   strategy Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
@@ -348,28 +348,28 @@ model Post {
   weekId             String?
   pillarId           String?
   campaignId         String?
-  conversationId     String?    // the chat it was created in, for posts outside a week or campaign
+  conversationId     String? // the chat it was created in, for posts outside a week or campaign
   status             PostStatus @default(draft)
   scheduledAt        DateTime?
-  format             String?    // reel | carousel | feed | story
-  contentType        String?    // static | video | story (counts per week follow the strategy)
+  format             String? // reel | carousel | feed | story
+  contentType        String? // static | video | story (counts per week follow the strategy)
   title              String?
   hook               String?
   caption            String?
   position           Int        @default(0)
   // Full details (5.2b), written in the background after the skeleton.
-  idea               Json?      // { hook, goal, funnelStage }
-  captionParts       Json?      // { hook, body, callToAction }
+  idea               Json? // { hook, goal, funnelStage }
+  captionParts       Json? // { hook, body, callToAction }
   hashtags           String[]
-  creativeDirection  Json?      // visualConcept, openingImpact, visualNarrative, mood, colorAndType, audienceEmotion, platformElements, execution
-  productionGuidance Json?      // objective, recordingPlan, editing, assets, checklist
+  creativeDirection  Json? // visualConcept, openingImpact, visualNarrative, mood, colorAndType, audienceEmotion, platformElements, execution
+  productionGuidance Json? // objective, recordingPlan, editing, assets, checklist
   postingReminders   String[]
   detailsStatus      String     @default("pending") // pending | ready | failed
   reminderEmail      Boolean    @default(true)
   reminderSentAt     DateTime?
   timeSuggested      Boolean    @default(true) // "· suggested" until the owner sets the time
   note               String?
-  dismissedMatches   String[]   // Instagram post ids the owner said aren't this post (6.4 "No, different post")
+  dismissedMatches   String[] // Instagram post ids the owner said aren't this post (6.4 "No, different post")
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -410,7 +410,7 @@ model PostValidation {
 model PostPublication {
   id              String   @id @default(uuid())
   postId          String   @unique
-  instagramPostId String   // id in the Social Data API
+  instagramPostId String // id in the Social Data API
   confirmedAt     DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -419,19 +419,19 @@ model PostPublication {
 // ---------- Production ----------
 
 model ShotList {
-  id        String   @id @default(uuid())
-  userId    String
-  weekId    String   @unique
-  status    String   @default("pending") // pending | ready | failed
-  title     String?  // "Film everything in one session"
-  summary   String?
+  id            String   @id @default(uuid())
+  userId        String
+  weekId        String   @unique
+  status        String   @default("pending") // pending | ready | failed
+  title         String? // "Film everything in one session"
+  summary       String?
   importantNote String?
-  sessions  Int      @default(1)
-  people    String[]
-  locations String[]
-  assets    String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  sessions      Int      @default(1)
+  people        String[]
+  locations     String[]
+  assets        String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   week  Week           @relation(fields: [weekId], references: [id], onDelete: Cascade)
@@ -454,7 +454,7 @@ model Export {
   id        String   @id @default(uuid())
   userId    String
   linkId    String   @unique
-  kind      String   // week | strategy | campaign
+  kind      String // week | strategy | campaign
   objectId  String
   include   Json?
   active    Boolean  @default(true)
@@ -467,20 +467,20 @@ model Export {
 // ---------- Calendar ----------
 
 model Campaign {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  goal      String?
-  startsOn  DateTime @db.Date
-  endsOn    DateTime @db.Date
-  color     String
-  status    String   @default("draft") // draft | saved (upcoming / active / ended come from the dates)
-  dateId    String?  // CommercialDate id, or UserCommercialDate id for the owner's own dates
+  id             String   @id @default(uuid())
+  userId         String
+  name           String
+  goal           String?
+  startsOn       DateTime @db.Date
+  endsOn         DateTime @db.Date
+  color          String
+  status         String   @default("draft") // draft | saved (upcoming / active / ended come from the dates)
+  dateId         String? // CommercialDate id, or UserCommercialDate id for the owner's own dates
   strategyId     String?
   objective      String?
   conversationId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   posts Post[]
@@ -494,7 +494,7 @@ model CommercialDate {
   date    DateTime @db.Date
   country String   @default("US")
   niches  String[]
-  tip     String?  // shown in 7.5 when there's no campaign yet, e.g. "Good for gift cards and pre-orders"
+  tip     String? // shown in 7.5 when there's no campaign yet, e.g. "Good for gift cards and pre-orders"
 
   @@unique([name, date])
 }
@@ -506,12 +506,12 @@ model UserCommercialDate {
   name             String?
   date             DateTime? @db.Date
   notThisYear      Boolean   @default(false) // on a CommercialDate row: "Not this year"
-  skippedYear      Int?      // the year "Not this year" applies to
+  skippedYear      Int? // the year "Not this year" applies to
   repeats          Boolean   @default(false) // own date: every year
-  suggestCampaign  Boolean   @default(true)  // own date: Duke suggests a campaign 3 to 4 weeks before
-  source           String    @default("own")      // own (added by the owner) | niche (Duke, from the niche)
+  suggestCampaign  Boolean   @default(true) // own date: Duke suggests a campaign 3 to 4 weeks before
+  source           String    @default("own") // own (added by the owner) | niche (Duke, from the niche)
   reviewStatus     String    @default("approved") // niche dates: approved (shown) | rejected (hidden by the team)
-  tip              String?                        // niche dates: why it fits this business
+  tip              String? // niche dates: why it fits this business
   createdAt        DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -527,7 +527,7 @@ model Note {
   title     String?
   text      String
   source    String   @default("manual") // chat | post_idea | manual | explore
-  postId    String?  // the post it turned into
+  postId    String? // the post it turned into
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -538,12 +538,12 @@ model Note {
 }
 
 model NoteReference {
-  id              String  @id @default(uuid())
+  id              String   @id @default(uuid())
   noteId          String
   instagramPostId String?
   url             String?
   kind            String   @default("own") // own (your post) | explore
-  label           String?  // "@bahiataste · your post"
+  label           String? // "@bahiataste · your post"
   thumbnailUrl    String?
   createdAt       DateTime @default(now())
 
@@ -555,7 +555,7 @@ model SavedPost {
   userId          String
   instagramPostId String
   source          String   @default("explore") // explore | watched | own
-  data            Json?    // the post as shown when saved (Discover results expire)
+  data            Json? // the post as shown when saved (Discover results expire)
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -570,7 +570,7 @@ model WatchedAccount {
   userId             String
   instagramProfileId String
   handle             String
-  label              String    // competitor | inspiration
+  label              String // competitor | inspiration
   minUntil           DateTime? // cannot be removed before this date
   createdAt          DateTime  @default(now())
 
@@ -588,33 +588,50 @@ model ExploreCache {
 
 // ---------- Review ----------
 
+// 12.4 · Timeline: "Started with HustleQ", then one per monthly review (what changed).
 model Milestone {
   id        String   @id @default(uuid())
   userId    String
-  kind      String
+  kind      String // start | review
+  date      DateTime @db.Date
+  title     String // "Started with HustleQ", "December review"
+  items     String[] // "Goals: added holiday catering orders"
+  reviewId  String?  @unique
   data      Json?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
+// 12.0 to 12.3 · Monthly review. month = the 1st of the month it opens (it looks back at the month before).
 model MonthlyReview {
-  id          String    @id @default(uuid())
-  userId      String
-  month       DateTime  @db.Date
-  analysis    Json?     // prepared in batch on day 1
-  step        Int       @default(0)
-  completedAt DateTime?
+  id             String    @id @default(uuid())
+  userId         String
+  month          DateTime  @db.Date
+  status         String    @default("preparing") // preparing | ready | active | done
+  analysis       Json? // numbers + Duke's summary, insights and "For <month>"
+  facts          Json? // what the analysis was written from
+  batchId        String? // Message Batch that prepares the analysis on day 1
+  conversationId String?
+  step           Int       @default(0) // 0 analysis, 1-5 the questions, 6 done
+  data           Json? // sub-state and the changes so far
+  preparedAt     DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month])
+  @@index([status])
 }
 
 model Suggestion {
   id          String    @id @default(uuid())
   userId      String
-  kind        String    // campaign | empty_day | monthly_review | strategy
+  kind        String // campaign | empty_day | monthly_review | strategy
   payload     Json?
   status      String    @default("open") // open | shown | accepted | dismissed
   createdAt   DateTime  @default(now())
@@ -648,7 +665,7 @@ model Subscription {
 model Usage {
   id          String   @id @default(uuid())
   userId      String
-  kind        String   // heavy_generation | validation | search | watch_slot
+  kind        String // heavy_generation | validation | search | watch_slot
   periodStart DateTime @db.Date
   count       Int      @default(0)
 
@@ -685,7 +702,7 @@ model Credit {
   id          String    @id @default(uuid())
   userId      String
   amountCents Int
-  source      String    // first_access
+  source      String // first_access
   usedAt      DateTime?
   createdAt   DateTime  @default(now())
 

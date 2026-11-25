@@ -96,7 +96,7 @@ postsRouter.post("/:id/regenerate", requireActivePlan, async (req, res) => {
 postsRouter.post("/:id/caption", requireActivePlan, async (req, res) => {
   const me = currentUser(req);
   const { id } = idParam.parse(req.params);
-  const { style, current } = z.object({ style: z.enum(["shorter", "casual", "direct"]).optional(), current: z.string().max(4000).optional() }).parse(req.body ?? {});
+  const { style, current } = z.object({ style: z.enum(["shorter", "casual", "direct", "hook"]).optional(), current: z.string().max(4000).optional() }).parse(req.body ?? {});
   res.json(await run(async () => {
     const post = await getFullPost(me.id, id);
     if (!post) return null;

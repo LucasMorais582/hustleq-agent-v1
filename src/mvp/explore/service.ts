@@ -90,14 +90,27 @@ async function startSearch(key: string, job: { niche: string; city: string; quer
   void runSearch({ key, ...job });
 }
 
-// The job: wait for the API (a miss can take minutes), keep the result, count the search.
+// The job: ask the API until the posts arrive (a miss takes minutes over there), keep the result,
+// count the search. The search runs in the API's worker, so a restart here only stops the asking:
+// searchingSince expires after 30 minutes and the next visit asks again (by then it's cached there).
+export const DISCOVER_POLL_MS = { every: 15_000, giveUpAfter: 28 * 60_000 };
+
 export async function runSearch(job: { key: string; niche: string; city: string; query: string | null; userId: string | null; tz?: string }) {
   try {
-    const r = await sda.discover({ niche: job.niche, city: job.city, query: job.query }, job.userId ? { userId: job.userId } : "service", 25 * 60_000);
+    const caller = job.userId ? { userId: job.userId } : ("service" as const);
+    const started = Date.now();
+    let waited = false;
+    let r = await sda.discover({ niche: job.niche, city: job.city, query: job.query }, caller);
+    while ("status" in r) {
+      if (Date.now() - started > DISCOVER_POLL_MS.giveUpAfter) throw new Error("discover still searching after the wait");
+      waited = true;
+      await new Promise((ok) => setTimeout(ok, DISCOVER_POLL_MS.every));
+      r = await sda.discover({ niche: job.niche, city: job.city, query: job.query }, caller);
+    }
     const data: CacheData = { posts: r.posts, fetchedAt: r.fetchedAt, searchingSince: null, failedAt: null };
     await db.exploreCache.update({ where: { key: job.key }, data: { data: data as object, fetchedAt: new Date(r.fetchedAt) } });
-    // The reserved search is given back when the API answered from its own cache.
-    if (job.userId && job.tz && r.fromCache) await refundSearch(job.userId, job.tz);
+    // The reserved search is given back when the API already had it (no new search over there).
+    if (job.userId && job.tz && r.fromCache && !waited) await refundSearch(job.userId, job.tz);
   } catch (error) {
     console.error("[explore] search failed", job.key, error);
     const row = await db.exploreCache.findUnique({ where: { key: job.key } });
