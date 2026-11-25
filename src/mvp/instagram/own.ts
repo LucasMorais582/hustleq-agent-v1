@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { isApiMode, socialData, type IgPost, type IgProfileBundle } from "../socialData/index.js";
 import { ownBundle } from "../socialData/api.js";
 import { linkUser } from "./link.js";
+import { keepImages } from "./thumbs.js";
 
 // The user's own Instagram, read through the Social Data adapter and kept for a day.
 // Synced when the invite is created, so onboarding (2.1, 2.2) opens with data.
@@ -36,7 +37,11 @@ async function readFromApi(handle: string, waitMs: number): Promise<IgProfileBun
   const deadline = Date.now() + waitMs;
   for (;;) {
     const read = await ownBundle(profileId, user.id);
-    if (read.syncStatus === "ready" || read.lastSyncedAt) return read.bundle; // a failed daily run keeps the last data
+    if (read.syncStatus === "ready" || read.lastSyncedAt) {
+      // Keep our own copy of the covers while Instagram's links still work (they expire in ~5 days).
+      void keepImages(profileId, read.bundle.posts.map((p) => ({ key: p.id, src: p.thumbnailUrl }))).catch((e) => console.error("[thumbs]", e));
+      return read.bundle; // a failed daily run keeps the last data
+    }
     if (read.syncStatus === "failed") throw new Error(`Social Data API sync failed for @${handle}`);
     // First sync still running over there (about 2 minutes after the invite).
     if (Date.now() > deadline) throw new Error(`Social Data API still syncing @${handle}`);

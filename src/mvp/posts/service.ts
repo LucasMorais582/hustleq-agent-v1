@@ -64,6 +64,8 @@ export async function presentFullPost(p: FullPost, user: { id: string; timezone:
     validation: latest ? { ...(latest.result as object), createdAt: latest.createdAt } : null,
     validationsLeft: await validationsLeft(user.id, user.timezone),
     editable: p.status !== "posted",
+    // Posted and matched with the Instagram post (6.4): its results page (11.7).
+    publishedPostId: (await db.postPublication.findUnique({ where: { postId: p.id }, select: { instagramPostId: true } }))?.instagramPostId ?? null,
   };
 }
 
