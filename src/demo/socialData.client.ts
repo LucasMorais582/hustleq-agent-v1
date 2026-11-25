@@ -74,7 +74,7 @@ function signToken(secret: string) {
     iss: process.env.SOCIAL_DATA_JWT_ISSUER || "hustleq",
     aud: process.env.SOCIAL_DATA_JWT_AUDIENCE || "hustleq-social-data-api",
     iat: now,
-    exp: now + 600,
+    exp: now + 240, // the Social Data API refuses tokens valid for more than 5 minutes
   }));
   const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
   return `${header}.${payload}.${signature}`;
