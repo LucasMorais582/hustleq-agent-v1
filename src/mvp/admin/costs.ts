@@ -35,6 +35,8 @@ function infraCosts(): { name: string; plan: string; usd: number }[] {
 
 const round = (n: number, d = 4) => Math.round(n * 10 ** d) / 10 ** d;
 
+export const SCENARIO_CUSTOMERS = 10;
+
 export async function costReport(month: string) {
   const from = new Date(`${month}-01T00:00:00Z`);
   const to = new Date(from);
@@ -94,6 +96,12 @@ export async function costReport(month: string) {
   // Fixed costs split evenly by the customer accounts of the month (paying + managed).
   const infraShare = customers.length ? round(infraTotal / customers.length, 2) : null;
   const apifyTotal = apify?.totalUsd ?? 0;
+  // Variable = Claude + Apify. "Projected" carries the month so far to its end at the same pace.
+  const pace = daysInMonth / elapsed;
+  const claudeProjected = accounts.reduce((s, a) => s + a.projectedMonth, 0);
+  const variableProjected = claudeProjected + apifyTotal * pace;
+  // What one customer would cost with SCENARIO_CUSTOMERS of them: fixed split + today's variable per customer.
+  const variablePerCustomer = customers.length ? variableProjected / customers.length : null;
   return {
     month,
     daysElapsed: round(elapsed, 1),
@@ -111,6 +119,19 @@ export async function costReport(month: string) {
     apify: apify ? { total: apify.totalUsd, unattributed: apify.unattributedUsd, byTrigger: apify.byTrigger } : null,
     infra: { items: infra, total: round(infraTotal, 2), perCustomer: infraShare },
     grandTotal: round(total + apifyTotal + infraTotal, 2),
+    totals: {
+      fixed: round(infraTotal, 2),
+      variable: round(total + apifyTotal, 2),
+      variableProjected: round(variableProjected, 2),
+      today: round(infraTotal + total + apifyTotal, 2),
+      projectedMonth: round(infraTotal + variableProjected, 2),
+    },
+    scenario: variablePerCustomer == null ? null : {
+      customers: SCENARIO_CUSTOMERS,
+      fixedShare: round(infraTotal / SCENARIO_CUSTOMERS, 2),
+      variablePerCustomer: round(variablePerCustomer, 2),
+      perCustomer: round(infraTotal / SCENARIO_CUSTOMERS + variablePerCustomer, 2),
+    },
     note: apify
       ? "Claude, Apify (Instagram data) and fixed infrastructure (plan prices). Resend and Apify's plan fee are not in this report."
       : "Claude and fixed infrastructure (plan prices). Apify (Instagram data) and Resend are not in this report.",

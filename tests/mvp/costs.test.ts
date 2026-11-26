@@ -24,6 +24,9 @@ describe("admin costs", () => {
     expect(acc).toMatchObject({ kind: "managed", total: 0.08, calls: 3, features: { chat: { cost: 0.03, calls: 2 }, post_details: { cost: 0.05, calls: 1 } } });
     expect(r.body.features.find((f: { feature: string }) => f.feature === "post_details")).toMatchObject({ calls: 1, avgPerCall: 0.05 });
     expect(r.body.note).toContain("fixed infrastructure");
+    expect(r.body.totals).toMatchObject({ fixed: 65 });
+    expect(r.body.totals.today).toBeCloseTo(65 + r.body.totals.variable, 2);
+    expect(r.body.scenario).toMatchObject({ customers: 10, fixedShare: 6.5 });
     expect(r.body.infra).toMatchObject({ total: 65, items: [{ name: "Vercel", usd: 20 }, { name: "Supabase", usd: 25 }, { name: "Railway", usd: 20 }] });
   });
 });
